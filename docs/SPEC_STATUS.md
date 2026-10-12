@@ -35,4 +35,4 @@ GitHub release v1.2.0 опубликован с тремя ZIP, каждый с�
 
 ## Unix preview status
 
-macOS and Ubuntu now have first locally cross-compiled native frontends/backend; they are preview ports with incomplete parity, not stable feature-complete implementations. Windows table above remains the Windows status. See PORT_TESTING.txt for missing DNS/NetBIOS, diagnostics, automatic monitoring, editor/context/history/statistics/complete layout and native validation. Universal/macOS DMG and Ubuntu x64 ZIP structurally verified; native tests not claimed.
+macOS and Ubuntu now have locally cross-compiled native frontends/backend with incomplete Windows parity. Windows table above remains the Windows status. See PORT_TESTING.txt for missing DNS/NetBIOS, diagnostics, automatic monitoring, editor/context/history/statistics/complete layout. User confirmed Mac port.1 startup/discovery. Ubuntu 26.04.1 x64 native core/backend and GTK workflows passed; docs/LINUX_VALIDATION.md records the actual checks and gaps. New Linux preview publication is prohibited; stable release remains gated on completion and validation.

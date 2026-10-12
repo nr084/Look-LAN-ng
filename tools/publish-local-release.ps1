@@ -1,16 +1,25 @@
 param([Parameter(Mandatory)][string]$Version,[Parameter(Mandatory)][string]$NotesFile,[Parameter(Mandatory)][string[]]$Assets,[switch]$Prerelease)
 $ErrorActionPreference='Stop'
 if($Version -notmatch '^\d+\.\d+\.\d+([-.][A-Za-z0-9.]+)?$'){throw 'Invalid release version'}
+$repository='nr084/Look-LAN-ng';$tag='v'+$Version
+$files=@($Assets | ForEach-Object {Get-Item -LiteralPath $_});if(!$files.Count){throw 'No release assets'}
+$linuxFiles=@($files | Where-Object Name -like 'look@lan-ng-linux-*.zip')
+if($linuxFiles.Count){
+    if($Prerelease){throw 'Linux preview publication is disabled by the user; publish only a completed, validated Linux release.'}
+    $proofPath=Join-Path $PSScriptRoot '../dist/linux-release-validation.json'
+    if(!(Test-Path -LiteralPath $proofPath)){throw 'Linux release validation report is missing.'}
+    $proof=Get-Content -LiteralPath $proofPath -Raw -Encoding utf8 | ConvertFrom-Json
+    if($proof.version -ne $Version -or $proof.native_tests -ne 'passed' -or $proof.feature_complete -ne $true){throw 'Linux release is not complete and natively validated.'}
+    foreach($file in $linuxFiles){if($proof.assets.($file.Name) -ne (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant()){throw 'Linux validation report does not match the release artifact.'}}
+}
+if(@($files.Name | Select-Object -Unique).Count -ne $files.Count){throw 'Duplicate asset names'}
+$notes=Get-Content -LiteralPath $NotesFile -Raw -Encoding utf8
+$commit=(git rev-parse HEAD).Trim();if($LASTEXITCODE){throw 'Not in source repository'}
 $env:GCM_INTERACTIVE='never';$env:GIT_TERMINAL_PROMPT='0'
 $lines="protocol=https`nhost=github.com`n`n" | git credential fill 2>$null
 $credential=@{};foreach($line in $lines){$pair=$line -split '=',2;if($pair.Count -eq 2){$credential[$pair[0]]=$pair[1]}}
 if(!$credential['password']){throw 'GitHub credentials unavailable'}
 $headers=@{Authorization=('Bearer '+$credential['password']);'User-Agent'='LookLAN-ng-local-release';Accept='application/vnd.github+json'}
-$repository='nr084/Look-LAN-ng';$tag='v'+$Version
-$files=@($Assets | ForEach-Object {Get-Item -LiteralPath $_});if(!$files.Count){throw 'No release assets'}
-if(@($files.Name | Select-Object -Unique).Count -ne $files.Count){throw 'Duplicate asset names'}
-$notes=Get-Content -LiteralPath $NotesFile -Raw -Encoding utf8
-$commit=(git rev-parse HEAD).Trim();if($LASTEXITCODE){throw 'Not in source repository'}
 $releases=Invoke-RestMethod "https://api.github.com/repos/$repository/releases?per_page=100" -Headers $headers
 $release=@($releases | Where-Object tag_name -eq $tag)
 if($release.Count -gt 1){throw 'Ambiguous release tag'}

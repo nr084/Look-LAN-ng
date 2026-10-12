@@ -7,8 +7,8 @@
 <key>CFBundleDisplayName</key><string>Look@LAN-ng</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>@PROJECT_VERSION@</string>
-<key>CFBundleVersion</key><string>@PROJECT_VERSION_MAJOR@.@PROJECT_VERSION_MINOR@.@PROJECT_VERSION_PATCH@.1</string>
-<key>CFBundleGetInfoString</key><string>@PROJECT_VERSION@-port.1</string>
+<key>CFBundleVersion</key><string>@PROJECT_VERSION_MAJOR@.@PROJECT_VERSION_MINOR@.@PROJECT_VERSION_PATCH@.2</string>
+<key>CFBundleGetInfoString</key><string>@PROJECT_VERSION@-port.2</string>
 <key>CFBundleIconFile</key><string>LookLAN.icns</string>
 <key>LSMinimumSystemVersion</key><string>13.0</string>
 <key>NSHighResolutionCapable</key><true/>

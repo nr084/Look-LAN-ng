@@ -39,6 +39,6 @@ scan_result_t scanner_services(const platform_net_ops_t *o, void *ctx, lan_host_
     h->ports_checked = true; h->os_family = OS_UNKNOWN; h->os_confidence = 0;
     if (printer) { h->os_family = OS_PRINTER; h->os_confidence = 70; }
     else if (windows && h->ttl > 64) { h->os_family = OS_WINDOWS; h->os_confidence = 65; }
-    else if (ssh && h->has_latency && h->ttl <= 64) { h->os_family = OS_LINUX; h->os_confidence = 50; }
+    else if (ssh && h->has_latency && h->ttl && h->ttl <= 64) { h->os_family = OS_LINUX; h->os_confidence = 50; }
     return SCAN_OK;
 }

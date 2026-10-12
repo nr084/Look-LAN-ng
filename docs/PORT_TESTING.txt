@@ -1,4 +1,4 @@
-Look@LAN-ng 1.2.0-port.1 — first native macOS / Ubuntu port preview
+Look@LAN-ng 1.2.0-port.2 — native macOS / Ubuntu development ports
 © nr084, build year
 
 Русский
@@ -23,12 +23,16 @@ Smoke-test.command запускает hidden own-IP integration, exit 0=passed,
 ./Look@LAN-ng.app/Contents/MacOS/Look@LAN-ng --smoke-test
 Проверьте как mount DMG, так и приложение после копирования из него.
 Universal содержит Intel x86_64 и Apple Silicon arm64; native тесты на Mac
-здесь не выполнялись. Settings: ~/Library/Application Support/LookLAN-ng/.
+здесь не выполнялись. Пользователь подтвердил запуск и LAN scan port.1;
+новый port.2 требует отдельного теста. Settings: ~/Library/Application Support/LookLAN-ng/.
 
 Ubuntu 22.04+ Desktop x64: распакуйте ZIP и запустите ./LookLAN.sh.
 Нужны системные GTK 3 libraries (libgtk-3-0), GUI session и обычный пользователь.
 Если распаковщик потерял execute mode: chmod +x LookLAN.sh 'Look@LAN-ng'.
-Native тесты Linux будут выполнены после предоставления тестовой машины.
+Ubuntu 26.04.1 x64: native core/backend и GTK GUI проверены на VM обычным
+пользователем, включая UPX binary, Stop/Close, языки, профили и экспорт.
+Ubuntu 22.04 остаётся cross-build baseline, на ней runtime не проверялся.
+Linux development ZIP не публикуется; релиз ожидает завершения портирования.
 Settings: ${XDG_CONFIG_HOME:-~/.config}/LookLAN-ng/.
 
 English
@@ -48,9 +52,12 @@ and allow local network access. Test mounting, launching, both languages,
 resizing, filtering, export, rescan, Stop and close during a scan.
 Smoke-test.command runs a hidden own-IP integration check: 0=passed,
 77=no active IPv4. Universal includes Intel x86_64 and Apple Silicon arm64;
-native Mac runtime/mount tests have not been performed here.
+The user confirmed startup and real LAN discovery for port.1 on a Mac.
+The full native matrix and the new port.2 binary still need Mac testing.
 
 Ubuntu 22.04+ Desktop x64: extract and run ./LookLAN.sh. System GTK 3 libraries
-(libgtk-3-0) and a GUI session are required. Native Linux validation is pending
-the user's test machine. If execute modes are lost, chmod +x the launcher
+(libgtk-3-0) and a GUI session are required. Native tests passed on Ubuntu
+26.04.1 x64, including packed startup and GTK workflows; 22.04 runtime is
+not verified. New Linux development ZIPs are withheld until a complete tested
+release. If execute modes are lost, chmod +x the launcher
 and binary. UPX decisions and SHA-256 are recorded in ports-package.json.

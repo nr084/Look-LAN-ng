@@ -1,0 +1,38 @@
+{
+  "fd_before": 6,
+  "fd_after": 6,
+  "max_stop_ms": 11,
+  "feature_complete": false,
+  "core_suites_passed": 6,
+  "gui_checks": [
+    "English system locale startup",
+    "Own IP real scan, name and MAC",
+    "Repeat scan deduplicates host",
+    "Filter hides nonmatching host",
+    "Filter restores host",
+    "Export csv",
+    "Export txt",
+    "Export html",
+    "Export HTML",
+    "Save UTF-8 profile",
+    "Open saved profile restores range",
+    "Uppercase HTML extension selects HTML",
+    "Real gateway scan",
+    "Invalid range dialog and recovery",
+    "F5 during active scan does not show error",
+    "Stop returns to idle",
+    "Close during scan exits cleanly",
+    "Close during scan bounded under 3s",
+    "Immediate Russian UI switch",
+    "Idle close",
+    "Saved Russian overrides English system locale",
+    "Russian system locale selects Russian",
+    "Saved English overrides Russian system locale"
+  ],
+  "environment": "Ubuntu 26.04.1 LTS x86_64, ordinary user, Xvfb/Openbox/GTK3",
+  "assets": {
+    "look@lan-ng-linux-x64-1.2.0-port.2.zip": "80eb9098c80d56c59cedb9b82d425aa949618f0c03214813736425bf51b4ddd6"
+  },
+  "native_tests": "passed",
+  "version": "1.2.0-port.2"
+}

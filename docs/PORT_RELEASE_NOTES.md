@@ -1,3 +1,5 @@
+Архив описания временного port.1: GitHub release и tag удалены по просьбе пользователя 12 октября 2026. Это исторические результаты, не доступная поставка. / Archived port.1 notes: the GitHub release and tag were removed at the user's request on 12 October 2026.
+
 ## Русский
 
 Первая тестовая версия портов macOS и Ubuntu, собранная **локально на Windows**. Это preview с неполной функциональной паритетностью Windows, не стабильный выпуск портов.

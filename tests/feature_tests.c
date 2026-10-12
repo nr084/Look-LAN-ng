@@ -14,6 +14,9 @@ static scan_result_t tcp(void *p, uint32_t ip, uint16_t port, uint32_t timeout) 
     if (f->result == SCAN_OK) return port == 80 || port == 445 ? SCAN_OK : SCAN_REFUSED;
     return f->result;
 }
+static scan_result_t ssh_only(void *p, uint32_t ip, uint16_t port, uint32_t timeout) {
+    (void)p;(void)ip;(void)timeout;return port == 22 ? SCAN_OK : SCAN_REFUSED;
+}
 int main(void) {
     uint16_t ports[1024]; size_t count = 999;
     CHECK(ports_parse("20-25,80,443,80",15,ports,1024,&count)); CHECK(count == 8 && ports[0] == 20 && ports[7] == 443);
@@ -31,6 +34,10 @@ int main(void) {
     CHECK(scanner_services(&ops,&fake,&host,quick_ports,quick_port_count,250) == SCAN_OK);
     CHECK(host.ports_checked && host.port_count == 2 && host.open_ports[0] == 80 && host.open_ports[1] == 445 && host.os_family == OS_WINDOWS);
     fake.cancelled = true; CHECK(scanner_services(&ops,&fake,&host,quick_ports,quick_port_count,250) == SCAN_CANCELLED);
+    fake.cancelled = false; ops.tcp_probe = ssh_only; host.ttl = 0;
+    CHECK(scanner_services(&ops,&fake,&host,quick_ports,quick_port_count,250) == SCAN_OK && host.os_family == OS_UNKNOWN);
+    host.ttl = 64;
+    CHECK(scanner_services(&ops,&fake,&host,quick_ports,quick_port_count,250) == SCAN_OK && host.os_family == OS_LINUX);
     const uint8_t valid[] = {'O','U','I','1',1,0,0,0,5,0,0,0,0x33,0x22,0,0,0,0,0,0,'A','c','m','e',0};
     vendor_table_t table; uint8_t mac[] = {0,0x22,0x33,1,2,3};
     CHECK(vendor_open(&table,valid,sizeof(valid))); CHECK(!strcmp(vendor_lookup(&table,mac),"Acme"));

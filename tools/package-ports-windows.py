@@ -49,7 +49,7 @@ def main():
     codesign=next((tools/'macos/rcodesign').rglob('rcodesign.exe'));upx,upx_version=upx_tool()
     source_bundle=ROOT/'build/macos-arm64/Look@LAN-ng.app';plist=plistlib.loads((source_bundle/'Contents/Info.plist').read_bytes());version=plist['CFBundleGetInfoString']
     output=ROOT/'dist'/version;output.mkdir(parents=True,exist_ok=True)
-    summary={'version':version,'build_host':'Windows','runtime_validation':'pending user Mac testing / future Linux machine','upx':upx_version}
+    summary={'version':version,'build_host':'Windows','runtime_validation':'new artifact requires its own native validation; see docs/LINUX_VALIDATION.md','upx':upx_version}
     with tempfile.TemporaryDirectory(prefix='port-package-',dir=ROOT/'build') as folder:
         work=Path(folder);payload=work/'payload';payload.mkdir();bundle=payload/'Look@LAN-ng.app';shutil.copytree(source_bundle,bundle)
         packing={};inputs=[]
