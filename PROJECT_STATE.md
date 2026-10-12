@@ -56,7 +56,7 @@ UPX latest stable 5.2.1, official archive SHA-256 verified; --ultra-brute --lzma
 
 GitHub workflow: https://github.com/nr084/Look-LAN-ng/actions/runs/38256307207 — success. CTest: x86 15/15 (56.39 s), x64 15/15 (51.09 s), ARM64 native 15/15 (45.05 s). Всего 45/45 и 12/12 packed smoke modes. x86/x64 runner Windows Server 2022, ARM64 runner Windows 11. ARM64 Debug и Release NBNS regression также passed: прямое чтение wire GROUP bit устраняет воспроизведённый optimized MSVC 2026 word/mask issue, high/low byte cases покрыты тестами.
 
-Будущие release tag v<version> автоматически запускают build/test/pack/publication с тремя отдельными архитектурными ZIP; workflow_dispatch собирает без публикации. README и release notes — RU/EN.
+После уточнения пользователя все новые builds локальные; прежний GitHub compilation workflow удалён. Публикация готовых assets — tools/publish-local-release.ps1. Windows distribution остаётся три архитектурных ZIP; README/release notes RU/EN.
 ## Явно непроверенные пункты и ограничения
 
 - Текущее окружение: Windows build **26300**, DisplayVersion **26H2**. Отдельные Windows 10/11, Wi-Fi/Ethernet/NIC unplug, physical DPI monitors и длительные LAN/leak sessions **не проверены**. Пользователь разрешил stable с этой оговоркой.
@@ -81,3 +81,5 @@ GitHub workflow: https://github.com/nr084/Look-LAN-ng/actions/runs/38256307207 �
 Compiled locally on Windows: Cocoa x86_64+arm64 universal, GTK3 x86_64-linux-gnu with Ubuntu 22.04 baseline. Common POSIX background ICMP/TCP backend / MAC cache / profiles / reports / RU-EN added. Full feature parity is pending; docs/PORT_TESTING.txt lists it explicitly. Native Mac mount/launch/LAN testing assigned to user, Linux native testing awaits user machine. Code-page/Info.plist/resource seals, universal architectures, genuine HFS+ DMG LZMA round-trip and execute modes verified. macOS DMG 721125 bytes, SHA256 1c313aa374fc6d326d5128f8fc6871cd0c8106064c070405ae36ed4a9baccee4. Linux UPX 5.2.1 --ultra-brute --lzma / integrity passed, ZIP 323769 bytes, SHA256 65338c87f2ad4c82fc8eb2e27c470f74ae9674cb572c158b4eb2c4e87cce7b58. Mac UPX unsupported in normal mode for both architectures; no force used. Ad-hoc, not notarized. Windows x64 rebuild / 15 tests passed, 51.66 s, after lan_host_t rename for Mach collision.
 
 GitHub compilation workflow removed per local-build instruction. Local build/package/publish scripts added. Old local release snapshots and temporary paths cleaned; current stable Windows artifacts and all current raw diagnostic / port builds retained. Published historical GitHub releases untouched.
+
+Preview опубликован: https://github.com/nr084/Look-LAN-ng/releases/tag/v1.2.0-port.1 . Оба assets скачаны обратно, SHA-256 совпадают с GitHub; release prerelease=true/draft=false, stable latest остаётся v1.2.0. Cocoa ARC property ownership дополнительно проверена compiler AST (strong), delegate lifetime explicit. Нативные macOS/Linux тесты не выполнялись.
