@@ -4,7 +4,7 @@
 
 | Проверка | Результат |
 | --- | --- |
-| C17/MSVC x64 Release, static CRT | Собрано без warnings |
+| C17/MSVC x86/x64/ARM64 Release, static CRT | Собрано без warnings |
 | Portable EXE, only system DLL, asInvoker | Проверены PE/imports/manifest |
 | Core/ranges/ports/vendor/monitor/profiles/reports/files | Automated tests passed |
 | NetBIOS fallback | Portable packet tests passed; unicast/source-bound Windows backend; live NetBIOS matrix не проверена |
@@ -16,7 +16,7 @@
 | Repeated Scan/Stop | 500 warm-up + 500 measured self-host cycles; stable sampling |
 | Close during scan | Hidden own-IP close-scan + 15 backend cycles с coordinator |
 | Close during diagnostics | Hidden own-IP close-tools + cancel/lifetime tests |
-| DPI 100–200%, RU/EN | 100 synthetic transitions; layout/overlap/GDI/USER |
+| DPI 100–200%, RU/EN | На каждой архитектуре 100 synthetic transitions; layout/overlap/GDI/USER |
 | Native appearance | Off-screen native preview inspected, sample data clearly marked |
 | UPX latest stable/max compression | Integrity/startup/DPI/close-scan проверяются при упаковке |
 | Windows 10 и Windows 11 отдельно | **Не проверены**; текущее окружение build 26300, DisplayVersion 26H2 |
@@ -24,7 +24,7 @@
 | Wi-Fi/Ethernet, several NICs, unplug/reconnect | **Полная ручная matrix не проверена** |
 | Unavailable DNS/ICMP-blocked/offline LAN | Doubles покрывают отдельные сценарии; **реальная matrix не проверена** |
 | Длительная LAN monitoring / memory / sockets | **Не проверено в течение часов/дней**; ограниченные tests не доказывают отсутствие любых утечек |
-| Win32/Linux/macOS | **Не реализованы**, будущие платформы |
+| Windows x86/x64/ARM64 | **Опубликованы**, 15/15 CTest и 4 packed smoke modes на архитектуру; ARM64 native Windows 11 |
 
 Остановка освобождает scan workers, но Windows ARP/ICMP IO может завершаться позже в bounded pools. При Close UI ждёт safe cleanup, оставаясь responsive. DNS cancellation также ждёт OS completion перед освобождением storage. Жёсткий предел shutdown для любого Windows/provider не обещается.
 
@@ -34,3 +34,5 @@ NetBIOS fallback, traceroute/Trace, standalone Ping/history, Open SSH и device 
 
 
 1.2: language menu commands and check state tested, system Russian/non-Russian mapping and explicit overrides tested. All six glyphs enabled/disabled rendered across 100 DPI transitions with bounded GDI/USER count. Native RU/EN previews inspected: docs/images/ui-preview.png and ui-preview-en.png, sample data and simulated scanning state; no network/INI writes. Full suite 15/15 passed (53.82 s), latest UI checks 4/4 passed (3.27 s).
+
+GitHub v1.2.0: https://github.com/nr084/Look-LAN-ng/releases/tag/v1.2.0 . CI success: https://github.com/nr084/Look-LAN-ng/actions/runs/38256307207 . x86 15/15, 56.39 s; x64 15/15, 51.09 s; ARM64 native 15/15, 45.05 s; packed 12/12. Download-back ZIP integrity, single EXE, version 1.2.0, PE machine 014c/8664/aa64, raw only-system imports and ASLR/NX flags verified. Linux/macOS future. Полная ручная Windows 10/11 matrix не закрыта проверкой hosted Windows 11 ARM64 и Server 2022 runners.

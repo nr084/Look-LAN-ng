@@ -1,6 +1,6 @@
 # Состояние проекта
 
-**Look@LAN-ng stable 1.2.0, Windows x64, 12 октября 2026.** Пользователь явно разрешил выпуск stable с перечислением непроверенных пунктов. Отдельная Windows 10/11 matrix не объявляется пройденной. Это решение сохранено в AGENTS.md и docs/RELEASE_CHECK.md.
+**Look@LAN-ng stable 1.2.0, Windows x86/x64/ARM64, 12 октября 2026.** Пользователь явно разрешил выпуск stable с перечислением непроверенных пунктов. Отдельная Windows 10/11 matrix не объявляется пройденной. Это решение сохранено в AGENTS.md и docs/RELEASE_CHECK.md.
 
 ## Готово
 
@@ -42,13 +42,21 @@ UI: EN/RU, 253-byte hostname, filter/tabs/states/ack/history/log, profile dialog
 
 ## Поставка
 
-- dist/Look@LAN-ng-1.2.0-win64.zip: **436001 bytes**.
-- dist/1.2.0/Look@LAN-ng.exe: **445440 bytes** (435 KiB).
-- build/unpacked/Look@LAN-ng.exe: **1125376 bytes**, diagnostic raw.
-- dist/release-info.json и dist/Look@LAN-ng-1.2.0-win64.json: параметры/размеры/SHA-256.
+Публичный repository: https://github.com/nr084/Look-LAN-ng . Первый GitHub release: https://github.com/nr084/Look-LAN-ng/releases/tag/v1.2.0 . Название приложения Look@LAN-ng сохранено; @ недопустим в repository name.
 
-Latest stable UPX **5.2.1**, official API/digest checked. **--ultra-brute --lzma**, 39.58% raw size. Integrity/startup/DPI/close-scan/close-tools packed tests passed. Numeric FileVersion и ProductVersion: 1.2.0; LegalCopyright: © nr084, 2026. ZIP содержит единственный EXE с совпадающим SHA-256. PE x64, ASLR/NX/HIGHENTROPYVA, без Guard CF, only system DLL. UPX stages и временные журналы/bitmap очищаются после финальной проверки; полезные artifacts и прежние ZIP сохранены. Никакой загрузки во внешние сервисы не выполнялось. Flat dist/Look@LAN-ng.exe успешно обновлён; versioned EXE находится в dist/1.2.0. Metadata latest_exe_updated=true; пользовательские процессы не завершались.
+| Архитектура | ZIP | ZIP bytes | Packed EXE bytes | Raw bytes |
+| --- | --- | --- | --- | --- |
+| x86 | look@lan-ng-x86-1.2.0.zip | 414358 | 423936 | 1076224 |
+| x64 | look@lan-ng-x64-1.2.0.zip | 436044 | 445440 | 1125376 |
+| ARM64 | look@lan-ng-arm64-1.2.0.zip | 511568 | 546816 | 1128448 |
 
+Все ZIP скачаны обратно из опубликованного релиза: SHA-256 совпадают с GitHub digest и release notes; каждый содержит только Look@LAN-ng.exe нужной архитектуры и версии 1.2.0. Packed binaries: dist/1.2.0/<architecture>/Look@LAN-ng.exe; raw diagnostic: build/unpacked/<architecture>/Look@LAN-ng.exe. Полные hashes/packing/test results: dist/release-info.json и dist/look@lan-ng-1.2.0.json. Прежние local ZIP сохранены как исторические artifacts; flat dist/Look@LAN-ng.exe обновлён до GitHub x64 binary, пользовательские процессы не завершались.
+
+UPX latest stable 5.2.1, official archive SHA-256 verified; --ultra-brute --lzma. Integrity и четыре packed smoke modes прошли для каждой архитектуры. ASLR/NX на всех targets, HIGHENTROPYVA только x64/ARM64; Guard CF отсутствует, static CRT/only system DLL подтверждены по raw imports. Несжатые binaries также сохранены в CI artifacts.
+
+GitHub workflow: https://github.com/nr084/Look-LAN-ng/actions/runs/38256307207 — success. CTest: x86 15/15 (56.39 s), x64 15/15 (51.09 s), ARM64 native 15/15 (45.05 s). Всего 45/45 и 12/12 packed smoke modes. x86/x64 runner Windows Server 2022, ARM64 runner Windows 11. ARM64 Debug и Release NBNS regression также passed: прямое чтение wire GROUP bit устраняет воспроизведённый optimized MSVC 2026 word/mask issue, high/low byte cases покрыты тестами.
+
+Будущие release tag v<version> автоматически запускают build/test/pack/publication с тремя отдельными архитектурными ZIP; workflow_dispatch собирает без публикации. README и release notes — RU/EN.
 ## Явно непроверенные пункты и ограничения
 
 - Текущее окружение: Windows build **26300**, DisplayVersion **26H2**. Отдельные Windows 10/11, Wi-Fi/Ethernet/NIC unplug, physical DPI monitors и длительные LAN/leak sessions **не проверены**. Пользователь разрешил stable с этой оговоркой.
@@ -66,4 +74,4 @@ Latest stable UPX **5.2.1**, official API/digest checked. **--ultra-brute --lzma
 
 Язык: **Вид → Язык / View → Language** → **Язык системы / System language (default)**, **English**, **Русский**. По умолчанию язык определяется по Windows UI language: русский → русский, любой другой → английский. Выбор применяется сразу и записывается в INI как `system`, `ru` или `en`; system mode остаётся автоматическим при следующих запусках. Ранее сохранённый явный выбор ru/en сохраняется. Profile editor, меню, таблица, вкладки, статистика, ошибки и диалоги используют выбранный язык; пользовательские имена/данные не переводятся.
 
-Публикация GitHub: публичный nr084/Look-LAN-ng (GitHub repository names не поддерживают @; имя приложения Look@LAN-ng сохранено). README и release notes на русском/английском. Уточнение artifact names: look@lan-ng-x86-<version>.zip, look@lan-ng-x64-<version>.zip, look@lan-ng-arm64-<version>.zip, один EXE внутри каждого. MSVC x86 build и 15/15 tests passed locally, 54.73 s; x64/ARM64 CI результаты будут записаны после завершения. HIGHENTROPYVA только для 64-bit, x86 ASLR/NX; исправлен compiler warning потенциально uninitialized IP.
+Публикация GitHub: публичный nr084/Look-LAN-ng (GitHub repository names не поддерживают @; имя приложения Look@LAN-ng сохранено). README и release notes на русском/английском. Уточнение artifact names: look@lan-ng-x86-<version>.zip, look@lan-ng-x64-<version>.zip, look@lan-ng-arm64-<version>.zip, один EXE внутри каждого. MSVC x86 build и 15/15 tests passed locally, 54.73 s; x64/ARM64 CI результаты подтверждены выше. HIGHENTROPYVA только для 64-bit, x86 ASLR/NX; исправлен compiler warning потенциально uninitialized IP.

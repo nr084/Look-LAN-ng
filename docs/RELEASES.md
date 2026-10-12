@@ -76,3 +76,17 @@ UPX 5.2.1 `--ultra-brute --lzma`: 1120768 → **443392 bytes** (433 KiB, 39.56%)
 UPX latest stable 5.2.1, official API/digest: `--ultra-brute --lzma`, 1125376 → 445440 bytes (435 KiB, 39.58%), ZIP 436001 bytes. Integrity и packed startup/DPI/close-scan/close-tools passed. ZIP содержит один EXE с проверенным hash, версия 1.2.0 / © nr084, 2026. Flat EXE обновлён успешно, versioned path: dist/1.2.0/Look@LAN-ng.exe. Пользовательские процессы не завершались.
 
 ZIP SHA-256: `AC036B10D70633FC5D889D3CC63B53DF24E0C194CFE3672352D1D656B3810E01`; EXE SHA-256: `03DD9B5CBE5DA0EB045752DD9AA3F56CC8A6A91AFDF6AA5FF2A9A3C646E4B52C`. Локальная поставка; внешней публикации нет.
+
+## First GitHub release v1.2.0 — x86 / x64 / ARM64
+
+12 октября 2026 опубликованы исходники в публичный https://github.com/nr084/Look-LAN-ng и первый GitHub release https://github.com/nr084/Look-LAN-ng/releases/tag/v1.2.0 . README и release notes на русском/английском. GitHub names не поддерживают @, имя приложения осталось Look@LAN-ng.
+
+Одна архитектура — один ZIP с одним EXE: look@lan-ng-x86-1.2.0.zip (414358 bytes), look@lan-ng-x64-1.2.0.zip (436044 bytes), look@lan-ng-arm64-1.2.0.zip (511568 bytes). UPX 5.2.1 --ultra-brute --lzma; packed EXE 423936 / 445440 / 546816 bytes. Raw diagnostic binaries сохранены в CI artifacts и build/unpacked/<arch>.
+
+45/45 CTest: x86 56.39 s, x64 51.09 s, native ARM64 45.05 s; 12/12 packed smoke modes, UPX integrity на всех трёх. CI: https://github.com/nr084/Look-LAN-ng/actions/runs/38256307207 . ASLR/NX on all; HIGHENTROPYVA only 64-bit; no Guard CF, static CRT/system DLL. Исправлен ARM64 optimized MSVC 2026 NBNS GROUP check; Release/Debug и high/low wire-byte regressions passed. ZIP скачаны обратно, digest/release-notes SHA-256/single EXE/machine/version проверены.
+
+ZIP SHA-256 x86: 14EE61EA0AD2A036D4E16DE4DBC4043DF0D2A038ADF49FA6B2140ECC51D4845D
+ZIP SHA-256 x64: A68FB16B3FE0D97D8537F60FC4260598CC4A27019D78B24BD5482809E983DEB6
+ZIP SHA-256 ARM64: F259E84A318F8193FC4B341AD3A04972371664C2471DBEBEA88A5C7DFA35FB9D
+
+Следующие v<version> tags автоматически публикуются после всех checks. Полная ручная Windows 10/11/NIC/physical DPI/long-LAN matrix по-прежнему не объявляется пройденной.
