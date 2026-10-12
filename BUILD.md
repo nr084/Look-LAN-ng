@@ -98,7 +98,7 @@ Windows GUI target создаётся только при WIN32. Межплат�
 
 ## Windows x86 / x64 / ARM64 and GitHub releases
 
-`tools/build-windows.ps1 -Architecture x86|x64|arm64` uses separate build/windows-<arch> directories and Visual Studio 2022 multi-config Release builds; CTest is invoked with -C Release. Install the corresponding MSVC target tools. Local x86 runs under WOW64; ARM64 runs natively on the GitHub windows-11-arm runner. ASLR/NX are enabled for all architectures, HIGHENTROPYVA only for 64-bit.
+`tools/build-windows.ps1 -Architecture x86|x64|arm64` uses separate build/windows-<arch> directories and Visual Studio 2022/2026 multi-config Release builds; CTest is invoked with -C Release. Install the corresponding MSVC target tools. Local x86 runs under WOW64; ARM64 runs natively on the GitHub windows-11-arm runner. ASLR/NX are enabled for all architectures, HIGHENTROPYVA only for 64-bit.
 
 `tools/package-windows-arch.ps1` verifies the official latest stable UPX archive digest, compresses with --ultra-brute --lzma, checks integrity and executes all four packed smoke modes on the corresponding runner. Architecture build-info.json is retained as a CI artifact.
 
