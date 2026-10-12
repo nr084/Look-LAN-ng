@@ -30,7 +30,10 @@ bool nbns_name(const uint8_t *p, size_t n, uint16_t transaction, char name[16]) 
             unsigned names = p[at]; if ((size_t)names*18+1 > bytes) return false;
             for (unsigned j = 0; j < names; ++j) {
                 const uint8_t *record = p+at+1+j*18;
-                if (record[15] || (word(record+16)&0x8000)) continue;
+                /* NBSTAT GROUP is bit 7 of the first on-wire flags byte.
+                   Test it directly: also avoids an ARM64 optimized word/mask
+                   code-generation issue seen with MSVC 2026. */
+                if (record[15] || (record[16]&0x80)) continue;
                 size_t length = 15; while (length && record[length-1] == ' ') --length;
                 bool valid = length != 0; for (size_t k = 0; k < length; ++k) if (record[k] < 32 || record[k] == 127) valid = false;
                 if (!valid) continue; memcpy(name,record,length); name[length] = 0; return true;

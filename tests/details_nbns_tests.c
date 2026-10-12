@@ -29,6 +29,11 @@ int main(void) {
         fputc('\n',stderr);
     }
     CHECK(parsed && !strcmp(name,"WORKSTATION"));
+    packet[80] = 0x80; /* Low-byte bit 7 must not replace the wire GROUP bit. */
+    CHECK(nbns_name(packet,99,0x1234,name) && !strcmp(name,"WORKSTATION"));
+    packet[79] = 0x04;
+    CHECK(nbns_name(packet,99,0x1234,name) && !strcmp(name,"WORKGROUP"));
+    packet[79] = 0x80; packet[80] = 0;
     for (size_t length = 0; length < 99; ++length) CHECK(!nbns_name(packet,length,0x1234,name));
     CHECK(!nbns_name(packet,99,0x4321,name));
     packet[2] = 0x86; CHECK(!nbns_name(packet,99,0x1234,name)); packet[2] = 0x84;
