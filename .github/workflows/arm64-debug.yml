@@ -1,0 +1,24 @@
+name: ARM64 parser diagnosis
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare optimized and debug parser
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = @(& $vswhere -latest -products '*' -format json | ConvertFrom-Json)[0]
+          $major = ([version]$vs.installationVersion).Major
+          $generator = if ($major -eq 18) { 'Visual Studio 18 2026' } else { 'Visual Studio 17 2022' }
+          cmake -S . -B build/arm64-diagnosis -G $generator -A ARM64
+          cmake --build build/arm64-diagnosis --config Release --target details_nbns_tests
+          & ./build/arm64-diagnosis/Release/details_nbns_tests.exe
+          $releaseResult = $LASTEXITCODE
+          cmake --build build/arm64-diagnosis --config Debug --target details_nbns_tests
+          & ./build/arm64-diagnosis/Debug/details_nbns_tests.exe
+          Write-Host "Release exit: $releaseResult; Debug exit: $LASTEXITCODE"

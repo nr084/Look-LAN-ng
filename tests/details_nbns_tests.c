@@ -22,7 +22,13 @@ int main(void) {
     packet[50] = 0xc0; packet[51] = 12; packet[53] = 0x21; packet[55] = 1; packet[61] = 37; packet[62] = 2;
     memset(packet+63,' ',15); memcpy(packet+63,"WORKGROUP",9); packet[79] = 0x80;
     memset(packet+81,' ',15); memcpy(packet+81,"WORKSTATION",11); packet[97] = 4;
-    CHECK(nbns_name(packet,99,0x1234,name) && !strcmp(name,"WORKSTATION"));
+    bool parsed = nbns_name(packet,99,0x1234,name);
+    if (!parsed || strcmp(name,"WORKSTATION")) {
+        fprintf(stderr,"NBNS diagnostic: parsed=%d name='%s'\n",(int)parsed,name);
+        for (size_t i = 0; i < 99; ++i) fprintf(stderr,"%02x%s",packet[i],i%16 == 15 ? "\n" : " ");
+        fputc('\n',stderr);
+    }
+    CHECK(parsed && !strcmp(name,"WORKSTATION"));
     for (size_t length = 0; length < 99; ++length) CHECK(!nbns_name(packet,length,0x1234,name));
     CHECK(!nbns_name(packet,99,0x4321,name));
     packet[2] = 0x86; CHECK(!nbns_name(packet,99,0x1234,name)); packet[2] = 0x84;
