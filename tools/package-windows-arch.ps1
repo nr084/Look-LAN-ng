@@ -7,6 +7,9 @@ if ($version -notmatch '^\d+\.\d+\.\d+(-rc\.\d+)?$') { throw 'Invalid executable
 if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") { throw 'Tag and executable version differ' }
 $output=Join-Path $projectRoot "dist/windows-$Architecture"
 New-Item -ItemType Directory -Force $output | Out-Null
+$unpacked=Join-Path $output 'unpacked'
+New-Item -ItemType Directory -Force $unpacked | Out-Null
+Copy-Item -LiteralPath $exe -Destination (Join-Path $unpacked 'Look@LAN-ng.exe') -Force
 $stage=Join-Path $projectRoot ('build/upx-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory $stage | Out-Null
 try {
@@ -44,6 +47,7 @@ try {
         options='--ultra-brute --lzma';integrity='passed';packed_smokes=$smokes
         runner_arch=$env:PROCESSOR_ARCHITECTURE;unpacked_bytes=(Get-Item $exe).Length
         packed_bytes=(Get-Item $destination).Length;exe_sha256=(Get-FileHash $destination).Hash
+        unpacked_sha256=(Get-FileHash $exe).Hash
     } | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $output 'build-info.json') -Encoding utf8
 } finally {
     $resolved=[IO.Path]::GetFullPath($stage)
