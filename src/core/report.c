@@ -25,7 +25,7 @@ static void utc_timestamp(uint64_t seconds, char *out, size_t cap) {
     time_t value = (time_t)seconds; struct tm *utc = gmtime(&value);
     if (!utc || !strftime(out,cap,"%Y-%m-%d %H:%M:%S",utc)) snprintf(out,cap,"—");
 }
-static const char *status(const host_info_t *h, bool ru) {
+static const char *status(const lan_host_t *h, bool ru) {
     if (!h->first_seen) return ru ? "НЕИЗВЕСТНО" : "UNKNOWN";
     if (!h->online) return ru ? "НЕ В СЕТИ" : "OFFLINE";
     if (h->new_device) return ru ? "НОВОЕ" : "NEW";
@@ -43,7 +43,7 @@ static bool write_row(report_format_t f, text_writer_t w, void *ctx, const char 
     }
     return text(w,ctx,f == REPORT_HTML ? "</tr>\n" : "\r\n");
 }
-bool report_write(report_format_t format, const host_info_t *hosts, size_t count, const vendor_table_t *vendors, const report_options_t *o, text_writer_t w, void *ctx) {
+bool report_write(report_format_t format, const lan_host_t *hosts, size_t count, const vendor_table_t *vendors, const report_options_t *o, text_writer_t w, void *ctx) {
     if (!w || !o || (count && !hosts) || format < REPORT_CSV || format > REPORT_HTML || !memchr(o->profile_name,0,sizeof(o->profile_name)) || !memchr(o->copyright,0,sizeof(o->copyright))) return false;
     const char *en[] = {"Status","IP Address","Host Name","MAC Address","Vendor","Device / OS","Latency (ms)","Services","First Seen (UTC)","Last Seen (UTC)"};
     const char *ru[] = {"Статус","IP-адрес","Имя узла","MAC-адрес","Производитель","Устройство / ОС","Задержка (мс)","Сервисы","Первое обнаружение (UTC)","Последний ответ (UTC)"};
@@ -56,7 +56,7 @@ bool report_write(report_format_t format, const host_info_t *hosts, size_t count
     if (!write_row(format,w,ctx,headings,lengths,true)) return false;
     if (format == REPORT_HTML && !text(w,ctx,"</thead><tbody>\n")) return false;
     for (size_t i = 0; i < count; ++i) {
-        const host_info_t *h = &hosts[i]; row_t row = {0};
+        const lan_host_t *h = &hosts[i]; row_t row = {0};
         if (h->address.family == 4) ipv4_format(ipv4_value(&h->address),row.ip,sizeof(row.ip));
         else if (h->address.family == 6) snprintf(row.ip,sizeof(row.ip),"%x:%x:%x:%x:%x:%x:%x:%x",((unsigned)h->address.bytes[0]<<8)|h->address.bytes[1],((unsigned)h->address.bytes[2]<<8)|h->address.bytes[3],((unsigned)h->address.bytes[4]<<8)|h->address.bytes[5],((unsigned)h->address.bytes[6]<<8)|h->address.bytes[7],((unsigned)h->address.bytes[8]<<8)|h->address.bytes[9],((unsigned)h->address.bytes[10]<<8)|h->address.bytes[11],((unsigned)h->address.bytes[12]<<8)|h->address.bytes[13],((unsigned)h->address.bytes[14]<<8)|h->address.bytes[15]);
         if (h->has_mac) snprintf(row.mac,sizeof(row.mac),"%02X:%02X:%02X:%02X:%02X:%02X",h->mac[0],h->mac[1],h->mac[2],h->mac[3],h->mac[4],h->mac[5]);

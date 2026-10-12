@@ -10,3 +10,8 @@
 *.bin binary
 *.ico binary
 *.png binary
+
+*.m text eol=lf
+*.py text eol=lf
+*.in text eol=lf
+*.txt text eol=lf

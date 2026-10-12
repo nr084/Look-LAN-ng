@@ -1,8 +1,8 @@
 #include "statistics.h"
-statistics_t statistics_compute(const host_info_t *hosts, size_t count, uint32_t scanned) {
+statistics_t statistics_compute(const lan_host_t *hosts, size_t count, uint32_t scanned) {
     statistics_t s = {0}; s.records = count; s.scanned = scanned;
     for (size_t i = 0; i < count; ++i) {
-        const host_info_t *h = &hosts[i];
+        const lan_host_t *h = &hosts[i];
         if (h->new_device) ++s.fresh;
         if (!h->first_seen) ++s.unknown; else if (!h->online) ++s.offline;
         if (!h->online) continue;

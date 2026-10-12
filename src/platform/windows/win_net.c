@@ -96,7 +96,7 @@ bool win_event_pop(win_backend_t *b, net_event_t *out) {
     if (available) { *out = b->events[b->head]; b->head = (b->head + 1) % EVENT_CAPACITY; --b->count; }
     LeaveCriticalSection(&b->lock); return available;
 }
-static void enqueue_dns(win_backend_t *b, const host_info_t *host, LONG generation) {
+static void enqueue_dns(win_backend_t *b, const lan_host_t *host, LONG generation) {
     EnterCriticalSection(&b->lock);
     if (b->dns_count < DNS_CAPACITY) {
         dns_task_t *task = &b->dns_tasks[(b->dns_head + b->dns_count++) % DNS_CAPACITY];
@@ -127,7 +127,7 @@ static DWORD WINAPI dns_worker(void *parameter) {
         InterlockedDecrement(&b->dns_active);
     }
 }
-static scan_result_t arp_probe(void *ctx, uint32_t ip, host_info_t *h) {
+static scan_result_t arp_probe(void *ctx, uint32_t ip, lan_host_t *h) {
     win_backend_t *b = ctx;
     h->interface_index = b->selected.index;
     if (ip == b->selected.ip) { if (b->selected.has_mac) { memcpy(h->mac, b->selected.mac, 6); h->has_mac = true; } return SCAN_OK; }
@@ -138,7 +138,7 @@ static scan_result_t arp_probe(void *ctx, uint32_t ip, host_info_t *h) {
     if (result == SCAN_OK) h->has_mac = true;
     return result;
 }
-static scan_result_t ping_probe(void *ctx, uint32_t ip, uint32_t timeout, host_info_t *h) {
+static scan_result_t ping_probe(void *ctx, uint32_t ip, uint32_t timeout, lan_host_t *h) {
     win_backend_t *b = ctx;
     if (!pace_probe(b)) return SCAN_CANCELLED;
     win_echo_result_t echo; scan_result_t result = win_ping_probe_ttl(&b->ping,b->selected.ip,ip,timeout,0,h,&echo,cancelled,b);
@@ -191,7 +191,7 @@ static DWORD WINAPI probe_worker(void *parameter) {
         LONG offset = InterlockedIncrement(&b->next) - 1;
         if ((uint32_t)offset >= b->total) break;
         uint32_t ip; if (!ranges_address_at(b->ranges,b->range_count,(uint32_t)offset,&ip)) break;
-        host_info_t host;
+        lan_host_t host;
         if (scanner_probe(&ops, b, ip, b->icmp_timeout_ms, &host) == SCAN_OK) {
             net_event_t e = {0}; e.type = NET_HOST; e.generation = b->generation; e.host = host;
             emit(b, &e); enqueue_dns(b, &host, e.generation);
@@ -285,7 +285,7 @@ bool win_backend_release(win_backend_t *b) {
 }
 bool win_scan_running(win_backend_t *b) { return b->coordinator && WaitForSingleObject(b->coordinator, 0) == WAIT_TIMEOUT; }
 static int compare_ip(const void *a, const void *c) { uint32_t x = *(const uint32_t *)a, y = *(const uint32_t *)c; return (x > y)-(x < y); }
-static bool start(win_backend_t *b, const win_interface_t *v, const ipv4_range_t *ranges, size_t range_count, const wchar_t *target, const uint16_t *ports, size_t port_count, bool monitoring, const host_info_t *hosts, size_t host_count, const profile_t *settings) {
+static bool start(win_backend_t *b, const win_interface_t *v, const ipv4_range_t *ranges, size_t range_count, const wchar_t *target, const uint16_t *ports, size_t port_count, bool monitoring, const lan_host_t *hosts, size_t host_count, const profile_t *settings) {
     if (!b->initialized || InterlockedCompareExchange(&b->shutdown,0,0) || win_scan_running(b) || !ranges || !range_count || range_count > NETWORK_MAX_RANGES) return false;
     ipv4_range_t normalized[NETWORK_MAX_RANGES]; memcpy(normalized,ranges,range_count*sizeof(*ranges)); uint64_t total;
     if (!ranges_normalize(normalized,&range_count,&total) || total > INT32_MAX) return false;
@@ -312,7 +312,7 @@ static bool start(win_backend_t *b, const win_interface_t *v, const ipv4_range_t
 }
 bool win_scan_start(win_backend_t *b, const win_interface_t *v, ipv4_range_t range) { return start(b,v,&range,1,NULL,discovery_ports,discovery_port_count,false,NULL,0,NULL); }
 bool win_scan_host_start(win_backend_t *b, const win_interface_t *v, const wchar_t *target, const uint16_t *ports, size_t count) { ipv4_range_t range = {0,0}; return start(b,v,&range,1,target,ports,count,false,NULL,0,NULL); }
-bool win_monitor_start(win_backend_t *b, const win_interface_t *v, ipv4_range_t range, const host_info_t *hosts, size_t count) { return start(b,v,&range,1,NULL,discovery_ports,discovery_port_count,true,hosts,count,NULL); }
-bool win_profile_scan_start(win_backend_t *b, const win_interface_t *v, const profile_t *p, bool monitoring, const host_info_t *hosts, size_t count) { return profile_validate(p,NULL,0) && start(b,v,p->ranges,p->range_count,NULL,p->ports,p->port_count,monitoring,hosts,count,p); }
+bool win_monitor_start(win_backend_t *b, const win_interface_t *v, ipv4_range_t range, const lan_host_t *hosts, size_t count) { return start(b,v,&range,1,NULL,discovery_ports,discovery_port_count,true,hosts,count,NULL); }
+bool win_profile_scan_start(win_backend_t *b, const win_interface_t *v, const profile_t *p, bool monitoring, const lan_host_t *hosts, size_t count) { return profile_validate(p,NULL,0) && start(b,v,p->ranges,p->range_count,NULL,p->ports,p->port_count,monitoring,hosts,count,p); }
 bool win_profile_host_start(win_backend_t *b, const win_interface_t *v, const wchar_t *target, const uint16_t *ports, size_t count, const profile_t *p) { ipv4_range_t range = {0,0}; return start(b,v,&range,1,target,ports,count,false,NULL,0,p); }
 void win_scan_stop(win_backend_t *b) { InterlockedExchange(&b->cancel, 1); }

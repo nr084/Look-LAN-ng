@@ -5,8 +5,8 @@
 #include <string.h>
 #define CHECK(x) do { if (!(x)) { fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x); return 1; } } while (0)
 typedef struct { bool cancelled; scan_result_t result; unsigned calls; } fake_t;
-static scan_result_t arp(void *p, uint32_t ip, host_info_t *h) { (void)p;(void)ip;(void)h;return SCAN_UNREACHABLE; }
-static scan_result_t ping(void *p, uint32_t ip, uint32_t timeout, host_info_t *h) { (void)p;(void)ip;(void)timeout;(void)h;return SCAN_TIMEOUT; }
+static scan_result_t arp(void *p, uint32_t ip, lan_host_t *h) { (void)p;(void)ip;(void)h;return SCAN_UNREACHABLE; }
+static scan_result_t ping(void *p, uint32_t ip, uint32_t timeout, lan_host_t *h) { (void)p;(void)ip;(void)timeout;(void)h;return SCAN_TIMEOUT; }
 static bool cancel(void *p) { return ((fake_t *)p)->cancelled; }
 static uint64_t clock_fake(void *p) { (void)p;return 123; }
 static scan_result_t tcp(void *p, uint32_t ip, uint16_t port, uint32_t timeout) {
@@ -22,7 +22,7 @@ int main(void) {
     CHECK(!ports_parse("100-1",5,ports,1024,&count)); CHECK(!ports_parse("80,",3,ports,1024,&count));
     CHECK(!ports_parse("1-1025",6,ports,1024,&count)); CHECK(!ports_parse("80\0,443",7,ports,1024,&count));
     CHECK(ports_parse("65535",5,ports,1024,&count) && count == 1 && ports[0] == 65535);
-    platform_net_ops_t ops = {arp,ping,cancel,clock_fake,tcp}; fake_t fake = {false,SCAN_REFUSED,0}; host_info_t host;
+    platform_net_ops_t ops = {arp,ping,cancel,clock_fake,tcp}; fake_t fake = {false,SCAN_REFUSED,0}; lan_host_t host;
     CHECK(scanner_probe(&ops,&fake,0xc0a80101,300,&host) == SCAN_OK); CHECK(host.online && fake.calls == 1 && host.port_count == 0);
     fake.result = SCAN_TIMEOUT; fake.calls = 0; CHECK(scanner_probe(&ops,&fake,1,300,&host) == SCAN_TIMEOUT); CHECK(fake.calls == discovery_port_count);
     fake.result = SCAN_CANCELLED; CHECK(scanner_probe(&ops,&fake,1,300,&host) == SCAN_CANCELLED);

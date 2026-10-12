@@ -45,7 +45,7 @@ Visual Studio Build Tools 2022, C++ toolchain нужной архитектур�
 ./tools/build-windows.ps1 -Architecture arm64
 ```
 
-GitHub Actions собирает и тестирует каждую архитектуру, максимально сжимает latest stable UPX (`--ultra-brute --lzma`), проверяет integrity и packed EXE. Push тега `v<версия>` публикует один релиз с тремя отдельными ZIP. SHA-256 ZIP включаются в описание релиза. Версия CMake, manifest, release notes и tag должны совпадать.
+Сборка, тесты и максимальное сжатие UPX выполняются локально. Готовые файлы публикуются `tools/publish-local-release.ps1`; для Windows один релиз содержит три отдельных ZIP. SHA-256 включаются в описание релиза. GitHub Actions не компилирует приложение.
 
 ## English
 
@@ -80,6 +80,14 @@ The complete manual Windows 10/11, physical DPI/NIC, network-failure and long-ru
 
 Use Visual Studio Build Tools 2022 with the target C++ architecture toolchain, Windows SDK and CMake. Run `tools/build-windows.ps1 -Architecture x86`, `x64` or `arm64` in PowerShell.
 
-GitHub Actions builds and tests each architecture, packs it using the latest stable UPX with `--ultra-brute --lzma`, and checks integrity and packed executable startup. Pushing a `v<version>` tag publishes one release with three separate architecture ZIPs. ZIP SHA-256 checksums appear in the release notes. CMake, manifest, release notes and tag versions must match.
+Build, tests and maximum UPX compression run locally. Publish completed files with `tools/publish-local-release.ps1`; Windows releases contain three architecture ZIPs and SHA-256 in the release notes. GitHub Actions does not compile the application.
 
 © nr084, build year / год сборки. Original Look@LAN code, logo and assets are not used.
+
+## macOS / Ubuntu port preview — 1.2.0-port.1
+
+**RU:** Первая тестовая версия: macOS 13+ universal Intel/Apple Silicon в DMG, Ubuntu 22.04+ Desktop x64 в ZIP. Собрана локально на Windows. Есть фоновое ICMP/TCP discovery, MAC/OUI, TCP services, таблица/фильтр, профили, экспорт и RU/EN. Полная паритетность Windows ещё не достигнута. Mac native testing выполняет пользователь; Linux testing ждёт тестовой машины. [Проверки и ограничения](docs/PORT_TESTING.txt), [preview release](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.2.0-port.1).
+
+**EN:** First port preview: macOS 13+ universal Intel/Apple Silicon DMG and Ubuntu 22.04+ Desktop x64 ZIP. Cross-compiled locally on Windows. Includes background ICMP/TCP discovery, MAC/OUI, TCP services, table/filter, profiles, export and RU/EN. Windows feature parity is incomplete. Native Mac testing is performed by the user; Linux testing awaits the user's machine. See [testing/limitations](docs/PORT_TESTING.txt) and the [preview release](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.2.0-port.1).
+
+Future compilation is local; the earlier GitHub Actions build workflow has been removed. Publish verified local artifacts with `tools/publish-local-release.ps1` and explicit release notes. Preview builds remain prereleases until native validation is completed.

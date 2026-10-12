@@ -1,7 +1,7 @@
 #include "scanner.h"
 #include <string.h>
 #include "ports.h"
-scan_result_t scanner_probe(const platform_net_ops_t *o, void *ctx, uint32_t ip, uint32_t timeout, host_info_t *h) {
+scan_result_t scanner_probe(const platform_net_ops_t *o, void *ctx, uint32_t ip, uint32_t timeout, lan_host_t *h) {
     memset(h, 0, sizeof(*h));
     h->address = ipv4_address(ip);
     if (o->cancelled(ctx)) return SCAN_CANCELLED;
@@ -22,7 +22,7 @@ scan_result_t scanner_probe(const platform_net_ops_t *o, void *ctx, uint32_t ip,
     h->first_seen = h->last_seen = o->wall_seconds(ctx);
     return SCAN_OK;
 }
-scan_result_t scanner_services(const platform_net_ops_t *o, void *ctx, host_info_t *h, const uint16_t *ports, size_t n, uint32_t timeout) {
+scan_result_t scanner_services(const platform_net_ops_t *o, void *ctx, lan_host_t *h, const uint16_t *ports, size_t n, uint32_t timeout) {
     if (!o->tcp_probe || !ports) return SCAN_SYSTEM_ERROR;
     h->port_count = 0; h->ports_truncated = false; h->ports_checked = false;
     bool windows = false, ssh = false, printer = false;

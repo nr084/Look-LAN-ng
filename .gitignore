@@ -2,3 +2,5 @@
 /dist/
 *.ini
 *.log
+__pycache__/
+*.pyc

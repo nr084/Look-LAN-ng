@@ -73,7 +73,7 @@ static int test_profile(const win_interface_t *interface) {
     puts("Profile backend passed: duplicate own-IP ranges normalized, custom port and configured timeouts/concurrency applied."); return 0;
 }
 static int test_monitor(const win_interface_t *interface) {
-    host_info_t known = {0}; known.address = ipv4_address(interface->ip); known.interface_index = interface->index; known.first_seen = 1;
+    lan_host_t known = {0}; known.address = ipv4_address(interface->ip); known.interface_index = interface->index; known.first_seen = 1;
     ipv4_range_t range = {interface->ip,interface->ip};
     if (!win_monitor_start(&backend,interface,range,&known,1)) return 1;
     ULONGLONG deadline = GetTickCount64()+10000; bool found = false, done = false, service_probe = false;

@@ -104,4 +104,21 @@ Windows GUI target создаётся только при WIN32. Межплат�
 
 `tools/collect-windows-release.ps1` validates executable hashes and consistent versions, then creates three ZIPs, each containing only Look@LAN-ng.exe: look@lan-ng-x86-<version>.zip, look@lan-ng-x64-<version>.zip, look@lan-ng-arm64-<version>.zip. SHA-256 ZIP hashes are appended to the bilingual release notes.
 
-`.github/workflows/release.yml`: a v<version> tag builds/tests/packages all three architectures and publishes the release after all jobs succeed. workflow_dispatch builds the same artifacts without publishing. Update CMake version, app.manifest and docs/RELEASE_NOTES.md before tagging. Releases go to https://github.com/nr084/Look-LAN-ng/releases .
+Historical first-release workflow compiled on GitHub. It is now removed: all new compilation is local on Windows. Publish verified local artifacts using tools/publish-local-release.ps1; releases go to https://github.com/nr084/Look-LAN-ng/releases .
+
+## Local Windows cross-build: macOS / Ubuntu
+
+This replaces the earlier GitHub Actions compilation workflow. No remote build jobs are used.
+
+```powershell
+python tools/build-ports-windows.py --tools-root path/to/shared/_tools
+python tools/package-ports-windows.py --tools-root path/to/shared/_tools
+```
+
+The default tool store is a read-only sibling KiTTY-NG/_tools: Windows LLVM 23.1.3, MacOSX27.0.sdk (deployment 13.0), CMake/Ninja, rcodesign, HFS+ DMG tool, and Ubuntu 22.04 x64 GTK3/glibc sysroot. Shared tooling is never edited. Both Mac architectures and the Linux ELF are compiled independently; llvm-lipo creates universal, rcodesign applies ad-hoc hardened-runtime signing, an independent validator checks all code pages and bundle seals. The genuine UDIF HFS+ image is LZMA compressed and extracted again to verify every file hash and execute mode. Mount/Gatekeeper/LAN tests on Mac remain pending.
+
+Latest stable UPX is fetched from the official release, archive/tool digests are checked including cache reuse. Linux uses --ultra-brute --lzma plus -t; native packed startup is pending the Linux host. Both Mach-O formats are probed; 5.2.1 refuses normal macOS packing, so no --force-macos is used. Raw diagnostics remain under build/unpacked/{macos/{x86_64,arm64},linux-x64}.
+
+CMake native Unix builds also support Cocoa or pkg-config GTK3. Core C17 is unchanged in layout; the application type is now lan_host_t to avoid collision with Apple's Mach host_info_t. Windows x64 was rebuilt and all 15 tests passed (51.66 s) after this rename.
+
+Publication: `tools/publish-local-release.ps1 -Version <version> -NotesFile <notes> -Assets <files> -Prerelease` uploads already built local files to a draft, verifies GitHub SHA-256/size and publishes only after upload verification. It does not compile or replace published assets. Use prerelease for unvalidated native ports.

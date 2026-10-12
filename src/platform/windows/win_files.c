@@ -89,7 +89,7 @@ struct win_export_job {
     DWORD error;
     wchar_t path[MAX_PATH];
     report_format_t format;
-    host_info_t *hosts;
+    lan_host_t *hosts;
     size_t count;
     vendor_table_t vendors;
     report_options_t options;
@@ -100,7 +100,7 @@ static DWORD WINAPI export_worker(void *parameter) {
     else if (!finish_write(&writer,job->path,report_write(job->format,job->hosts,job->count,&job->vendors,&job->options,write_bytes,&writer))) job->error = GetLastError();
     free(job->hosts); job->hosts = NULL; return 0;
 }
-win_export_job_t *win_export_start(const wchar_t *path, report_format_t format, const host_info_t *hosts, size_t count, const vendor_table_t *vendors, const report_options_t *options) {
+win_export_job_t *win_export_start(const wchar_t *path, report_format_t format, const lan_host_t *hosts, size_t count, const vendor_table_t *vendors, const report_options_t *options) {
     if (!path || wcslen(path) > MAX_PATH-48 || count > SIZE_MAX/sizeof(*hosts) || !vendors || !options || (count && !hosts)) return NULL;
     win_export_job_t *job = calloc(1,sizeof(*job)); if (!job) return NULL;
     if (count) { job->hosts = malloc(count*sizeof(*hosts)); if (!job->hosts) { free(job); return NULL; } memcpy(job->hosts,hosts,count*sizeof(*hosts)); }

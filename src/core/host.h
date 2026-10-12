@@ -18,7 +18,7 @@ typedef struct {
     bool new_device, changed, ip_correlated;
     uint8_t missed_rounds;
     uint64_t seen_round;
-} host_info_t;
+} lan_host_t;
 /* Caller owns storage; upsert merges only known fields. No hidden allocation. */
-size_t host_merge(host_info_t *hosts, size_t *count, size_t capacity, const host_info_t *incoming);
+size_t host_merge(lan_host_t *hosts, size_t *count, size_t capacity, const lan_host_t *incoming);
 #endif

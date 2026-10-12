@@ -13,7 +13,7 @@ static void add_event(monitor_t *m, monitor_event_type_t type, size_t index, con
     if (index < *m->count) event->address = m->hosts[index].address;
     text_copy(event->previous,previous); text_copy(event->current,current);
 }
-void monitor_init(monitor_t *m, host_info_t *hosts, size_t *count, size_t cap, monitor_event_t *log, size_t log_cap) {
+void monitor_init(monitor_t *m, lan_host_t *hosts, size_t *count, size_t cap, monitor_event_t *log, size_t log_cap) {
     memset(m,0,sizeof(*m)); m->hosts = hosts; m->count = count; m->capacity = cap; m->log = log; m->log_capacity = log_cap; m->offline_threshold = 2;
     *count = 0;
 }
@@ -27,14 +27,14 @@ void monitor_begin_ranges(monitor_t *m, const ipv4_range_t *ranges, size_t count
     char first[32], last[32], detail[128]; ipv4_format(m->range_count ? ranges[0].first : 0,first,32); ipv4_format(m->range_count ? ranges[0].last : 0,last,32); snprintf(detail,sizeof(detail),"%s - %s (%zu ranges)",first,last,m->range_count);
     add_event(m,MON_SCAN_STARTED,SIZE_MAX,NULL,track_absent ? detail : "Single host",now);
 }
-static size_t find_host(const monitor_t *m, const host_info_t *v) {
+static size_t find_host(const monitor_t *m, const lan_host_t *v) {
     for (size_t i = 0; i < *m->count; ++i) {
-        const host_info_t *h = &m->hosts[i];
+        const lan_host_t *h = &m->hosts[i];
         if (h->interface_index == v->interface_index && h->address.family == v->address.family && h->address.scope_id == v->address.scope_id && !memcmp(h->address.bytes,v->address.bytes,16)) return i;
     }
     return SIZE_MAX;
 }
-size_t monitor_observe(monitor_t *m, const host_info_t *incoming, bool confirmed, uint64_t now) {
+size_t monitor_observe(monitor_t *m, const lan_host_t *incoming, bool confirmed, uint64_t now) {
     size_t index = find_host(m,incoming); bool existed = index != SIZE_MAX;
     bool known = existed && m->hosts[index].first_seen != 0;
     bool online = existed && m->hosts[index].online;
@@ -43,7 +43,7 @@ size_t monitor_observe(monitor_t *m, const host_info_t *incoming, bool confirmed
     char old_mac[256] = "", new_mac[256] = "", old_name[256] = "";
     if (mac_changed) { mac_text(m->hosts[index].mac,old_mac); mac_text(incoming->mac,new_mac); }
     if (name_changed) text_copy(old_name,m->hosts[index].hostname);
-    host_info_t value = *incoming;
+    lan_host_t value = *incoming;
     /* A cached MAC or late DNS snapshot must never prove liveness or overwrite
        a confirmed MAC. DNS only supplies an enrichment update. */
     if (!confirmed) {
@@ -58,7 +58,7 @@ size_t monitor_observe(monitor_t *m, const host_info_t *incoming, bool confirmed
     }
     index = host_merge(m->hosts,m->count,m->capacity,&value);
     if (index == SIZE_MAX) return index;
-    host_info_t *host = &m->hosts[index];
+    lan_host_t *host = &m->hosts[index];
     if (confirmed) {
         if (!incoming->has_latency) host->has_latency = false;
         if (mac_changed) {
@@ -77,11 +77,11 @@ size_t monitor_observe(monitor_t *m, const host_info_t *incoming, bool confirmed
     return index;
 }
 static void correlate_ip(monitor_t *m, size_t old_index, uint64_t now) {
-    host_info_t *old = &m->hosts[old_index];
+    lan_host_t *old = &m->hosts[old_index];
     if (!old->has_mac || (old->mac[0]&3) || old->ip_correlated) return;
     size_t found = SIZE_MAX; unsigned candidates = 0;
     for (size_t i = 0; i < *m->count; ++i) {
-        host_info_t *current = &m->hosts[i];
+        lan_host_t *current = &m->hosts[i];
         if (i != old_index && current->interface_index == old->interface_index && current->has_mac && !memcmp(old->mac,current->mac,6)) { ++candidates; if (current->online) found = i; }
     }
     if (candidates != 1 || found == SIZE_MAX) return; /* Avoid proxy-ARP / shared MAC guesses. */
@@ -92,7 +92,7 @@ static void correlate_ip(monitor_t *m, size_t old_index, uint64_t now) {
 void monitor_finish(monitor_t *m, bool complete, uint64_t now) {
     if (complete && m->track_absent) {
         for (size_t i = 0; i < *m->count; ++i) {
-            host_info_t *h = &m->hosts[i]; uint32_t ip = ipv4_value(&h->address);
+            lan_host_t *h = &m->hosts[i]; uint32_t ip = ipv4_value(&h->address);
             if (h->address.family != 4 || h->interface_index != m->interface_index || !ranges_contains(m->ranges,m->range_count,ip) || !h->first_seen) continue;
             if (h->seen_round == m->round) { h->missed_rounds = 0; continue; }
             if (h->missed_rounds < 255) ++h->missed_rounds;

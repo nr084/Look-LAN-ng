@@ -32,3 +32,7 @@
 Язык: **Вид → Язык / View → Language** → **Язык системы / System language (default)**, **English**, **Русский**. По умолчанию язык определяется по Windows UI language: русский → русский, любой другой → английский. Выбор применяется сразу и записывается в INI как `system`, `ru` или `en`; system mode остаётся автоматическим при следующих запусках. Ранее сохранённый явный выбор ru/en сохраняется. Profile editor, меню, таблица, вкладки, статистика, ошибки и диалоги используют выбранный язык; пользовательские имена/данные не переводятся.
 
 GitHub release v1.2.0 опубликован с тремя ZIP, каждый содержит один architecture-specific EXE. 45/45 CTest и 12/12 packed smokes passed; ARM64 native Windows 11, x86/x64 Windows Server 2022. NetBIOS GROUP flag проверяется непосредственно в wire byte; Release/Debug ARM64 и high/low byte regression passed. CI: https://github.com/nr084/Look-LAN-ng/actions/runs/38256307207 .
+
+## Unix preview status
+
+macOS and Ubuntu now have first locally cross-compiled native frontends/backend; they are preview ports with incomplete parity, not stable feature-complete implementations. Windows table above remains the Windows status. See PORT_TESTING.txt for missing DNS/NetBIOS, diagnostics, automatic monitoring, editor/context/history/statistics/complete layout and native validation. Universal/macOS DMG and Ubuntu x64 ZIP structurally verified; native tests not claimed.

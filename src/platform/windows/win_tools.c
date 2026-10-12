@@ -14,7 +14,7 @@ static bool stopped(void *context) { return InterlockedCompareExchange(&((win_to
 static DWORD WINAPI run_tool(void *context) {
     win_tools_job_t *job = context;
     for (unsigned i = 0; i < (job->trace ? 30u : 4u) && !stopped(job); ++i) {
-        host_info_t host = {0}; win_echo_result_t echo;
+        lan_host_t host = {0}; win_echo_result_t echo;
         scan_result_t result = win_ping_probe_ttl(job->pool,job->source,job->target,job->timeout,job->trace ? (uint8_t)(i+1) : 0,&host,&echo,stopped,job);
         if (result == SCAN_CANCELLED || stopped(job)) break;
         ping_sample_t sample = {0}; sample.ip = job->target; sample.interface_index = job->interface_index; sample.timestamp = (uint64_t)time(NULL);

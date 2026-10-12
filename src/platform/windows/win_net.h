@@ -18,8 +18,8 @@ typedef struct {
     bool automatic, has_mac;
 } win_interface_t;
 typedef enum { NET_HOST, NET_DNS, NET_PROGRESS, NET_DONE, NET_ERROR, NET_PING } net_event_type_t;
-typedef struct { net_event_type_t type; LONG generation; host_info_t host; uint32_t completed; bool cancelled; DWORD error; } net_event_t;
-typedef struct { host_info_t host; LONG generation; uint32_t source; } dns_task_t;
+typedef struct { net_event_type_t type; LONG generation; lan_host_t host; uint32_t completed; bool cancelled; DWORD error; } net_event_t;
+typedef struct { lan_host_t host; LONG generation; uint32_t source; } dns_task_t;
 typedef struct win_backend {
     CRITICAL_SECTION lock;
     HANDLE wake, coordinator, dns_threads[4];
@@ -52,8 +52,8 @@ void win_backend_shutdown(win_backend_t *backend);
 bool win_backend_release(win_backend_t *backend);
 bool win_scan_start(win_backend_t *backend, const win_interface_t *selected, ipv4_range_t range);
 bool win_scan_host_start(win_backend_t *backend, const win_interface_t *selected, const wchar_t *target, const uint16_t *ports, size_t count);
-bool win_monitor_start(win_backend_t *backend, const win_interface_t *selected, ipv4_range_t range, const host_info_t *hosts, size_t count);
-bool win_profile_scan_start(win_backend_t *backend, const win_interface_t *selected, const profile_t *profile, bool monitoring, const host_info_t *hosts, size_t count);
+bool win_monitor_start(win_backend_t *backend, const win_interface_t *selected, ipv4_range_t range, const lan_host_t *hosts, size_t count);
+bool win_profile_scan_start(win_backend_t *backend, const win_interface_t *selected, const profile_t *profile, bool monitoring, const lan_host_t *hosts, size_t count);
 bool win_profile_host_start(win_backend_t *backend, const win_interface_t *selected, const wchar_t *target, const uint16_t *ports, size_t count, const profile_t *profile);
 void win_scan_stop(win_backend_t *backend);
 bool win_event_pop(win_backend_t *backend, net_event_t *event);

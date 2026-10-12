@@ -33,7 +33,7 @@ int main(void) {
     const char escape[] = "Look@LAN-ngProfile=1\nrange=10.0.0.1\nnotes=bad\\q\n"; CHECK(!profile_parse(escape,sizeof(escape)-1,&loaded,error,sizeof(error)));
     const char multiline[] = "Look@LAN-ngProfile=1\nrange=10.0.0.1\nname=bad\\nname\n"; CHECK(!profile_parse(multiline,sizeof(multiline)-1,&loaded,error,sizeof(error)));
     profile_t *bad_profile = &loaded; profile_defaults(bad_profile); bad_profile->range_count = 1; bad_profile->ranges[0] = profile.ranges[0]; bad_profile->icmp_timeout_ms = 49; CHECK(!profile_validate(bad_profile,error,sizeof(error)));
-    host_info_t hosts[3] = {0}; hosts[0].address = ipv4_address(0xc0a80101); hosts[0].first_seen = hosts[0].last_seen = 100; hosts[0].online = true; hosts[0].new_device = true; hosts[0].os_family = OS_WINDOWS; hosts[0].os_confidence = 65; hosts[0].ports_checked = true; hosts[0].port_count = 1; hosts[0].open_ports[0] = 80;
+    lan_host_t hosts[3] = {0}; hosts[0].address = ipv4_address(0xc0a80101); hosts[0].first_seen = hosts[0].last_seen = 100; hosts[0].online = true; hosts[0].new_device = true; hosts[0].os_family = OS_WINDOWS; hosts[0].os_confidence = 65; hosts[0].ports_checked = true; hosts[0].port_count = 1; hosts[0].open_ports[0] = 80;
     snprintf(hosts[0].hostname,sizeof(hosts[0].hostname),"=HYPERLINK(\"bad\"),\n<script>alert(1)</script>&"); hosts[1].address = ipv4_address(0xc0a80102); hosts[1].first_seen = 99; hosts[2].address = ipv4_address(0xc0a80103);
     report_options_t options = {0}; snprintf(options.profile_name,sizeof(options.profile_name),"Office <&>"); snprintf(options.copyright,sizeof(options.copyright),"© nr084, 2026"); vendor_table_t vendors = {0};
     memset(&output,0,sizeof(output)); CHECK(report_write(REPORT_CSV,hosts,3,&vendors,&options,write_memory,&output)); CHECK(!memcmp(output.bytes,"\xef\xbb\xbf",3)); CHECK(strstr(output.bytes,"\"'=HYPERLINK(\"\"bad\"\")") && strstr(output.bytes,"OFFLINE") && strstr(output.bytes,"UNKNOWN"));
@@ -41,7 +41,7 @@ int main(void) {
     memset(&output,0,sizeof(output)); options.russian = true; CHECK(report_write(REPORT_TXT,hosts,3,&vendors,&options,write_memory,&output)); CHECK(strstr(output.bytes,"Статус") && strstr(output.bytes,"1970-01-01 00:01:40"));
     output.reject = true; CHECK(!report_write(REPORT_HTML,hosts,3,&vendors,&options,write_memory,&output));
     statistics_t stats = statistics_compute(hosts,3,254); CHECK(stats.records == 3 && stats.online == 1 && stats.offline == 1 && stats.unknown == 1 && stats.fresh == 1 && stats.windows == 1 && stats.scanned == 254);
-    host_info_t tracked[4]; size_t tracked_count; monitor_event_t log[32]; monitor_t monitor;
+    lan_host_t tracked[4]; size_t tracked_count; monitor_event_t log[32]; monitor_t monitor;
     monitor_init(&monitor,tracked,&tracked_count,4,log,32); hosts[0].interface_index = 1; hosts[1].interface_index = 1; hosts[1].online = true;
     ipv4_range_t all = {0xc0a80101,0xc0a80103}; monitor_begin(&monitor,all,1,true,200); monitor_observe(&monitor,&hosts[0],true,201); monitor_observe(&monitor,&hosts[1],true,201); monitor_finish(&monitor,true,202);
     ipv4_range_t scopes[] = {{0xc0a80101,0xc0a80101},{0xc0a80103,0xc0a80103}};

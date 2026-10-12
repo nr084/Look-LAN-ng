@@ -16,6 +16,6 @@ bool win_ping_init(win_ping_pool_t *pool);
 void win_ping_stop(win_ping_pool_t *pool);
 bool win_ping_release(win_ping_pool_t *pool);
 typedef struct { uint32_t address, latency_ms, status; uint8_t ttl; bool received; } win_echo_result_t;
-scan_result_t win_ping_probe_ttl(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, uint8_t ttl, host_info_t *host, win_echo_result_t *echo, bool (*cancel)(void *), void *context);
-scan_result_t win_ping_probe(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, host_info_t *host, bool (*cancel)(void *), void *context);
+scan_result_t win_ping_probe_ttl(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, uint8_t ttl, lan_host_t *host, win_echo_result_t *echo, bool (*cancel)(void *), void *context);
+scan_result_t win_ping_probe(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, lan_host_t *host, bool (*cancel)(void *), void *context);
 #endif

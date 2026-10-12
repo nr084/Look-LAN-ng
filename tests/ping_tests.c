@@ -60,13 +60,13 @@ static bool complete_pending(win_ping_pool_t *pool) {
     return true;
 }
 int main(void) {
-    win_ping_pool_t pool = {0}; host_info_t host = {0};
+    win_ping_pool_t pool = {0}; lan_host_t host = {0};
     CHECK(win_ping_init(&pool) && !win_ping_init(&pool));
     for (mode = SYNC_REPLY; mode <= ASYNC_REPLY; ++mode) {
         CHECK(win_ping_probe(&pool,1,2,5000,&host,never_cancel,NULL) == SCAN_OK);
         CHECK(host.has_latency && host.latency_ms == 123 && host.ttl == 64 && !pending_count(&pool));
     }
-    mode = FAILED_REPLY; host = (host_info_t){0};
+    mode = FAILED_REPLY; host = (lan_host_t){0};
     CHECK(win_ping_probe(&pool,1,2,5000,&host,never_cancel,NULL) == SCAN_UNREACHABLE && !host.has_latency);
     mode = SYNC_REPLY; reply_status = IP_TTL_EXPIRED_TRANSIT; win_echo_result_t echo;
     CHECK(win_ping_probe_ttl(&pool,1,2,5000,7,&host,&echo,never_cancel,NULL) == SCAN_UNREACHABLE && echo.received && echo.status == IP_TTL_EXPIRED_TRANSIT && echo.address == 0xc0a80101 && echo.latency_ms == 123 && last_ttl == 7 && !host.has_latency);

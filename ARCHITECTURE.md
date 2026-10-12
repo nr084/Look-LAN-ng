@@ -69,3 +69,11 @@ DNS update отделён от confirmed discovery: он может измени
 Журнал — ring из максимум 10000 структур с sequence, timestamp, event type, host index и previous/current details. UI добавляет только новые записи в отдельный native ListView; History берёт события выбранного stable row index из этой же ring. State полностью принадлежит UI thread; worker events проходят через существующую bounded queue. Смена NIC начинает новую сессию.
 
 Toolbar glyphs: win_toolbar_icons.c, original GDI geometry rendered at 4x then HALFTONE downsample. Every temporary DC/bitmap/pen/brush is released per draw; DPI smoke renders all six enabled/disabled glyphs over 100 transitions and checks GDI/USER resource counts. UI language preference system/ru/en is separate from resolved russian flag; system follows GetUserDefaultUILanguage at startup and explicit menu selection persists immediately.
+
+## First Unix port baseline
+
+posix_net.c: selected source IPv4, macOS IP_BOUND_IF, nonblocking TCP and unprivileged ICMP datagram sockets, cancel-aware 25 ms polling, bounded 8–256 workers / 512-event queue, global 4 ms pacing and <=65536 address union. NIC enumeration uses getifaddrs; MAC comes from local link data or post-liveness /proc/net/arp (Linux) / routing sysctl (Darwin), never cache liveness. Own-host name uses gethostname. Separate DNS/NetBIOS/diagnostics are pending port work.
+
+desktop_app.c owns the host/monitor/profile/vendor state and UI-thread event consumption. Background coordinator owns workers and joins them off the UI thread; UI reap checks atomic completion. Shutdown is idempotent and releases model only after worker completion. UTF-8 profile/report writes use same-directory mkstemp, flush/fsync/rename; currently synchronous UI file I/O. Cocoa adapter is thin Objective-C/ARC with a precisely retained delegate; backend/model remain C17. Ubuntu adapter uses system GTK3. Settings use macOS Application Support or XDG config; system Russian selects Russian, other locales English. Multiple profile ranges are retained when the editable range field is empty.
+
+The core device type lan_host_t replaces host_info_t because Cocoa imports a different Mach typedef with that name. Struct layout and Windows behavior remain unchanged; Windows regression tests passed.

@@ -70,7 +70,7 @@ typedef struct {
     LONG generation;
     ULONGLONG started;
     ULONGLONG elapsed;
-    host_info_t hosts[HOST_CAPACITY];
+    lan_host_t hosts[HOST_CAPACITY];
     size_t host_count;
     wchar_t ini[MAX_PATH];
     wchar_t filter_text[128];
@@ -197,7 +197,7 @@ static void update_status(void) {
     }
     EnableWindow(app.tree,!app.closing);
 }
-static void row_text(const host_info_t *h, int col, wchar_t *s, size_t cap) {
+static void row_text(const lan_host_t *h, int col, wchar_t *s, size_t cap) {
     s[0] = 0;
     switch (col) {
     case 0: swprintf_s(s,cap,L"%ls", !h->first_seen ? tr(L"UNKNOWN",L"НЕИЗВЕСТНО") : !h->online ? tr(L"OFFLINE",L"НЕ В СЕТИ") : h->new_device ? tr(L"NEW",L"НОВОЕ") : h->changed ? tr(L"CHANGED",L"ИЗМЕНЕНО") : tr(L"ONLINE",L"В СЕТИ")); break;
@@ -236,7 +236,7 @@ static int row_for(size_t index) {
     LVFINDINFOW find = {0}; find.flags = LVFI_PARAM; find.lParam = (LPARAM)index;
     return ListView_FindItem(app.list, -1, &find);
 }
-static bool matches_filter(const host_info_t *host) {
+static bool matches_filter(const lan_host_t *host) {
     if (!app.filter_text[0]) return true;
     for (int col = 0; col < 8; ++col) {
         wchar_t text[1024]; row_text(host,col,text,1024);
@@ -296,7 +296,7 @@ static void show_detail(void) {
     if (tab == 4) { sync_log(false); return; }
     size_t index = selected_host();
     if (index == SIZE_MAX) { SetWindowTextW(app.detail,tr(L"Select a host to view details. Double-click a row or press Enter.",L"Выберите узел для просмотра. Двойной щелчок по строке или Enter.")); return; }
-    host_info_t *h = &app.hosts[index];
+    lan_host_t *h = &app.hosts[index];
     wchar_t text[4096], ip[32], name[256], mac[48], first[64], last[64];
     row_text(h,1,ip,32); row_text(h,2,name,256); row_text(h,3,mac,48); timestamp(h->first_seen,first,64); timestamp(h->last_seen,last,64);
     if (tab == 3) {
@@ -353,7 +353,7 @@ static void show_detail(void) {
 }
 static int CALLBACK compare_rows(LPARAM a, LPARAM b, LPARAM unused) {
     (void)unused;
-    host_info_t *x = &app.hosts[a], *y = &app.hosts[b]; int result;
+    lan_host_t *x = &app.hosts[a], *y = &app.hosts[b]; int result;
     if (app.sort_column == 1) { uint32_t p = ipv4_value(&x->address), q = ipv4_value(&y->address); result = (p > q) - (p < q); }
     else if (app.sort_column == 6) result = (x->latency_ms > y->latency_ms) - (x->latency_ms < y->latency_ms);
     else { wchar_t p[512], q[512]; row_text(x,app.sort_column,p,512); row_text(y,app.sort_column,q,512); result = _wcsicmp(p,q); }
@@ -925,7 +925,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM 
         SendMessageW(window,WM_COMMAND,ID_SYSTEM_LANGUAGE,0);
         if (!app.system_language || app.russian != language_is_russian(L"system",GetUserDefaultUILanguage())) ExitProcess(47);
         app.russian = original; app.system_language = original_system; localize();
-        host_info_t example = {0}; example.address = ipv4_address(0xc0a80101); example.online = true; example.has_mac = true;
+        lan_host_t example = {0}; example.address = ipv4_address(0xc0a80101); example.online = true; example.has_mac = true;
         const uint8_t microsoft_mac[] = {0,0x50,0xf2,1,2,3}; memcpy(example.mac,microsoft_mac,6);
         memset(example.hostname,'n',253); example.hostname[253] = 0;
         ipv4_range_t scope = {0xc0a80101,0xc0a801fe}; monitor_begin(&app.model,scope,0,true,100);
@@ -991,7 +991,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM 
             app.selected = app.interface_count ? 0 : -1; update_status();
             ipv4_range_t range = {0xc0a80101,0xc0a801fe}; monitor_begin(&app.model,range,0,true,100);
             const char *names[] = {"gateway","workstation","nas"};
-            for (unsigned i = 0; i < 3; ++i) { host_info_t sample = {0}; sample.address = ipv4_address(0xc0a80101+i*9); sample.online = i != 2; sample.has_mac = true; memcpy(sample.mac,microsoft_mac,6); sample.mac[5] += (uint8_t)i; snprintf(sample.hostname,256,"%s",names[i]); sample.first_seen = sample.last_seen = (uint64_t)time(NULL); sample.has_latency = sample.online; sample.latency_ms = i+1; sample.os_family = i == 1 ? OS_WINDOWS : OS_UNKNOWN; sample.os_confidence = i == 1 ? 65 : 0; size_t row = monitor_observe(&app.model,&sample,sample.online,(uint64_t)time(NULL)); update_row(row); }
+            for (unsigned i = 0; i < 3; ++i) { lan_host_t sample = {0}; sample.address = ipv4_address(0xc0a80101+i*9); sample.online = i != 2; sample.has_mac = true; memcpy(sample.mac,microsoft_mac,6); sample.mac[5] += (uint8_t)i; snprintf(sample.hostname,256,"%s",names[i]); sample.first_seen = sample.last_seen = (uint64_t)time(NULL); sample.has_latency = sample.online; sample.latency_ms = i+1; sample.os_family = i == 1 ? OS_WINDOWS : OS_UNKNOWN; sample.os_confidence = i == 1 ? 65 : 0; size_t row = monitor_observe(&app.model,&sample,sample.online,(uint64_t)time(NULL)); update_row(row); }
             SetWindowTextW(app.summary,tr(L"Preview — sample data, no network scan",L"Предпросмотр — демонстрационные данные, без сканирования"));
             app.scanning = true; app.started = GetTickCount64(); InterlockedExchange(&app.backend.cancel,0);
             update_status(); TabCtrl_SetCurSel(app.tabs,5); show_detail(); if (!preview_bitmap()) ExitProcess(28); app.scanning = false;

@@ -5,7 +5,7 @@
 #include <string.h>
 #define CHECK(x) do { if (!(x)) { fprintf(stderr,"Tools check failed at %d: %s\n",__LINE__,#x); return 1; } } while (0)
 static int mode; static volatile LONG calls, bad_binding;
-static scan_result_t fake_probe(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, uint8_t ttl, host_info_t *host, win_echo_result_t *echo, bool (*cancel)(void *), void *context) {
+static scan_result_t fake_probe(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, uint8_t ttl, lan_host_t *host, win_echo_result_t *echo, bool (*cancel)(void *), void *context) {
     (void)pool; (void)timeout; (void)host;
     if (source != 1 || target != 2) InterlockedIncrement(&bad_binding);
     InterlockedIncrement(&calls); memset(echo,0,sizeof(*echo));

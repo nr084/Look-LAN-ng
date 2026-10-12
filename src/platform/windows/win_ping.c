@@ -54,7 +54,7 @@ bool win_ping_release(win_ping_pool_t *pool) {
     CloseHandle(pool->reaper); CloseHandle(pool->wake); pool->reaper = pool->wake = NULL;
     DeleteCriticalSection(&pool->lock); pool->initialized = false; return true;
 }
-scan_result_t win_ping_probe_ttl(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, uint8_t ttl, host_info_t *host, win_echo_result_t *echo, bool (*cancel)(void *), void *context) {
+scan_result_t win_ping_probe_ttl(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, uint8_t ttl, lan_host_t *host, win_echo_result_t *echo, bool (*cancel)(void *), void *context) {
     if (echo) memset(echo,0,sizeof(*echo));
     if (!pool->initialized || !host || !cancel || !timeout || timeout > 5000) return SCAN_SYSTEM_ERROR;
     size_t slot = PING_CAPACITY;
@@ -107,6 +107,6 @@ scan_result_t win_ping_probe_ttl(win_ping_pool_t *pool, uint32_t source, uint32_
     EnterCriticalSection(&pool->lock); pool->requests[slot] = NULL; --pool->count; SetEvent(pool->wake); LeaveCriticalSection(&pool->lock);
     dispose(request); return result;
 }
-scan_result_t win_ping_probe(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, host_info_t *host, bool (*cancel)(void *), void *context) {
+scan_result_t win_ping_probe(win_ping_pool_t *pool, uint32_t source, uint32_t target, uint32_t timeout, lan_host_t *host, bool (*cancel)(void *), void *context) {
     return win_ping_probe_ttl(pool,source,target,timeout,0,host,NULL,cancel,context);
 }

@@ -1,6 +1,6 @@
 #include "host.h"
 #include <string.h>
-size_t host_merge(host_info_t *h, size_t *n, size_t cap, const host_info_t *v) {
+size_t host_merge(lan_host_t *h, size_t *n, size_t cap, const lan_host_t *v) {
     for (size_t i = 0; i < *n; ++i) {
         if (h[i].address.family != v->address.family || h[i].address.scope_id != v->address.scope_id ||
             h[i].interface_index != v->interface_index || memcmp(h[i].address.bytes, v->address.bytes, 16)) continue;
