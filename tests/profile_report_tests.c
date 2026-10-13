@@ -41,6 +41,7 @@ int main(void) {
     memset(&output,0,sizeof(output)); options.russian = true; CHECK(report_write(REPORT_TXT,hosts,3,&vendors,&options,write_memory,&output)); CHECK(strstr(output.bytes,"Статус") && strstr(output.bytes,"1970-01-01 00:01:40"));
     output.reject = true; CHECK(!report_write(REPORT_HTML,hosts,3,&vendors,&options,write_memory,&output));
     statistics_t stats = statistics_compute(hosts,3,254); CHECK(stats.records == 3 && stats.online == 1 && stats.offline == 1 && stats.unknown == 1 && stats.fresh == 1 && stats.windows == 1 && stats.scanned == 254);
+    hosts[1].cache_only=true;stats=statistics_compute(hosts,3,254);CHECK(stats.unknown==2 && stats.offline==0);memset(&output,0,sizeof(output));CHECK(report_write(REPORT_CSV,hosts,3,&vendors,&options,write_memory,&output));CHECK(!strstr(output.bytes,"OFFLINE"));hosts[1].cache_only=false;
     lan_host_t tracked[4]; size_t tracked_count; monitor_event_t log[32]; monitor_t monitor;
     monitor_init(&monitor,tracked,&tracked_count,4,log,32); hosts[0].interface_index = 1; hosts[1].interface_index = 1; hosts[1].online = true;
     ipv4_range_t all = {0xc0a80101,0xc0a80103}; monitor_begin(&monitor,all,1,true,200); monitor_observe(&monitor,&hosts[0],true,201); monitor_observe(&monitor,&hosts[1],true,201); monitor_finish(&monitor,true,202);

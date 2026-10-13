@@ -1,3 +1,19 @@
+# Current work — 13 October 2026: local 1.3.0-rc.2
+
+Public GitHub still has stable Windows v1.2.0 only; the temporary port release/tag was removed. No new port preview or candidate is published. Latest ports are compiled and packaged locally on Windows.
+
+Implemented since port.2: fresh unprivileged ARP notifications, async reverse DNS/NBNS with scoped cache/generation protection, standalone Ping/Trace plus scan ping history, timed monitoring without repeated service scans, Single Host hostname/IPv4, profile editor/remapping and saved-profile tree, native context actions, notes/history/log/statistics, six details tabs, numeric sorting, incremental GTK rows, background atomic file I/O, geometry/columns and RU/EN/system persistence. Linux ELF uses PIE/full RELRO/NX; UPX stable 5.2.1 maximum LZMA with integrity check. macOS remains universal with valid ad-hoc seals and LZMA DMG.
+
+Linux runtime/GUI tests use the user's Ubuntu 26.04.1 x64 VM as an ordinary user; compilation never runs there. Six native suites, ARP-only/static-cache fixtures and 38 GUI scenarios have passed. Final candidate exact artifact verification is recorded in docs/LINUX_VALIDATION.md and local build/validation. Tests create isolated configurations; root is used only to create/remove owned virtual fixtures. Credentials are not saved in source/docs/artifacts.
+
+Windows x64 regression: 14 tests passed in sandbox; backend TCP test passed separately outside network sandbox (43.24 s), hence all 15 test cases passed. The first restricted run's TCP failure is retained as diagnostic evidence, not hidden.
+
+macOS rc.2 native test is outstanding. User confirmation for old port.1 is not reused as proof for the new binary. Local DMG contains Smoke-test.command, Native-tests.command and a manual checklist. Do not publish a finished release until native results arrive; publisher checks both OS proof reports and exact hashes. Keep the offered rc.1 until the user has moved to rc.2; other superseded local port outputs may be cleaned. Final release screenshots are still pending.
+
+---
+
+The sections below are historical records; use the current state above for release decisions.
+
 # Состояние проекта
 
 **Look@LAN-ng stable 1.2.0, Windows x86/x64/ARM64, 12 октября 2026.** Пользователь явно разрешил выпуск stable с перечислением непроверенных пунктов. Отдельная Windows 10/11 matrix не объявляется пройденной. Это решение сохранено в AGENTS.md и docs/RELEASE_CHECK.md.

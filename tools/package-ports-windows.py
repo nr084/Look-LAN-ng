@@ -64,9 +64,13 @@ def main():
         call([codesign,'sign','--code-signature-flags','runtime',bundle]);verify_bundle(codesign,bundle)
         readme=ROOT/'docs/PORT_TESTING.txt';shutil.copyfile(readme,payload/'README.txt')
         smoke=payload/'Smoke-test.command';smoke.write_text('#!/bin/sh\nlooklan_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\n"$looklan_dir/Look@LAN-ng.app/Contents/MacOS/Look@LAN-ng" --smoke-test\nlooklan_result=$?\nprintf "Smoke result: %s (0=passed, 77=no active IPv4)\\n" "$looklan_result"\nexit "$looklan_result"\n',encoding='utf-8',newline='\n')
+        native=None;native_script=None
+        if '-rc.' in version:
+            native=payload/'Native-tests';call([llvm/'llvm-lipo.exe','-create',ROOT/'build/macos-x86_64/posix_runtime_tests',ROOT/'build/macos-arm64/posix_runtime_tests','-output',native]);call([codesign,'sign',native])
+            native_script=payload/'Native-tests.command';native_script.write_text("#!/bin/sh\nlooklan_dir=\"$(CDPATH= cd -- \"$(dirname -- \"$0\")\" && pwd)\"\nlooklan_temp=\"$(mktemp -d -t looklan-validation)\" || exit 1\ntrap 'rm -rf -- \"$looklan_temp\"' EXIT HUP INT TERM\nmkdir -p \"$looklan_temp/Library/Application Support\"\nHOME=\"$looklan_temp\" \"$looklan_dir/Native-tests\" >\"$looklan_dir/Native-tests.log\" 2>&1\nlooklan_result=$?\ncat \"$looklan_dir/Native-tests.log\"\nprintf \"Native result: %s\\n\" \"$looklan_result\"\nexit \"$looklan_result\"\n",encoding='utf-8',newline='\n')
         carrier=work/'metadata';carrier.mkdir();records=[]
         for path in [payload]+sorted(payload.rglob('*')):
-            relative='.' if path==payload else path.relative_to(payload).as_posix();directory=path.is_dir();mode=0o40755 if directory else 0o100755 if path in (binary,smoke) else 0o100644
+            relative='.' if path==payload else path.relative_to(payload).as_posix();directory=path.is_dir();mode=0o40755 if directory else 0o100755 if path in (binary,smoke,native,native_script) else 0o100644
             record={'original':relative,'materialized':relative,'kind':'directory' if directory else 'file','materializedKind':'directory' if directory else 'file','darwin':{'mode':mode,'uid':0,'gid':0}}
             if not directory:record['payload']={'sha256':digest(path),'size':path.stat().st_size}
             records.append(record)

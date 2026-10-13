@@ -1,33 +1,40 @@
-# Linux native validation — 12 October 2026
+# Linux native validation — 13 October 2026
 
-Compilation and packaging were performed locally on Windows. The user's SSH VM ran Ubuntu 26.04.1 LTS x86_64; tests ran as an ordinary user without root privileges. GTK 3, Xvfb, Openbox, D-Bus and AT-SPI supplied the isolated GUI test session. Openbox and its dependencies were installed on the VM for testing. No remote compilation was used.
+Compilation and packaging took place locally on Windows. The provided VM runs Ubuntu 26.04.1 LTS x86_64. All scanner/test executables ran as an ordinary user. Root created and removed only owned veth/network-namespace fixtures; no remote compilation was used. GUI tests use isolated D-Bus/Xvfb/Openbox and separate configuration directories.
 
-## Results / Результаты
+The current **local candidate 1.3.0-rc.2** is not a published stable release.
 
-- Five portable C test executables passed: core, features, monitor, profiles/reports and details/NBNS. These cover simulated discovery, state transitions, parsing and escaping; they are not live NetBIOS or network-loss tests.
-- The original published port.1 ZIP SHA-256 matched `65338c87f2ad4c82fc8eb2e27c470f74ae9674cb572c158b4eb2c4e87cce7b58`. Its UPX-packed application and the raw binary both passed native own-IP smoke tests.
-- The corrected port.2 UPX build passed startup and real scans of the VM's own IPv4 and its gateway. The gateway returned ICMP latency, MAC/vendor enrichment and TCP service results. Discovery did not need root.
-- The new POSIX integration test passed scan/rescan, invalid-range recovery, 100 Scan/Stop cycles and close/idempotence. File descriptors remained **6 → 6**; maximum Stop measured **11 ms** in this run. This is a bounded own-IP stress check, not a long-duration LAN leak test.
-- **23 GTK GUI checks** passed: English system locale; own IP/name/MAC; deduplication; filtering; CSV/TXT/HTML exports including uppercase `.HTML`; save/open profiles; gateway; invalid range; F5 while scanning; Stop; close while scanning with exit 0 under 3 seconds; immediate RU switch; idle close; saved language overrides and Russian system-locale selection. Export contents and the saved profile/settings were also read back and checked.
-- System-language mapping was exercised through environment locale values. A Russian desktop installation and physical DPI/monitor configurations were not tested.
-- Windows x64 regression after the shared TTL correction: **15/15 CTest passed, 52.74 s**.
+| Evidence | Result |
+| --- | --- |
+| Five portable C suites | Passed: core, features, monitor, profile/report, details/NBNS |
+| Native POSIX integration | Passed: selected-source DNS fixture and parser, name cache/MAC invalidation, stale generations, missing-interface protection/remapping, timed monitoring, history/statistics/notes, four Ping replies, one-hop Trace, diagnostic cancellation, async snapshot/export/profile/cancellation |
+| 100 Scan/Stop cycles | Passed; final run FD 6 → 6, maximum Stop 11 ms |
+| Close/idempotence | Passed; bounded under 3 s |
+| Fresh ARP-only host | Passed without root: namespace drops all ICMP/TCP/UDP input; fresh ARP still confirms ONLINE with MAC and no fake latency |
+| Static neighbor cache | Passed: cached MAC alone stays UNKNOWN, with no first_seen/ONLINE evidence |
+| Raw ELF | PIE (DYN), GNU_RELRO+BIND_NOW, RW non-executable GNU_STACK |
+| UPX | Stable 5.2.1; official digest verified; --ultra-brute --lzma; upx -t passed |
+| Final ZIP/modes | SHA-256 and binary bytes matched on VM; execute modes preserved |
+| Packed own-IP scan | Passed |
+| Packed GTK workflows | 38/38 passed using the exact binary identified below |
+| Windows x64 regression | All 15 test cases passed: 14 in sandbox and TCP backend separately outside restricted network sandbox (43.24 s) |
 
-Reproduce GUI tests on Linux using the locally cross-built binary:
+Final Linux ZIP SHA-256: `d6fc81385b89363d7e6acc4695bcf97f7d58fd880be9d323e98b1128317dffb6`.
+Packed executable SHA-256: `cc4de1a920775d2015ed727b0cf6e49bd46526b20c7e3b87c74d322bb92f78cd`.
+The final README update changed the archive hash; a byte-for-byte comparison on VM confirmed the binary was identical to the 38/38 GUI-tested executable, then packed own-IP smoke was repeated.
+
+The GUI suite covers real own-IP/name/MAC and gateway, scan deduplication, filter, CSV/TXT/HTML and uppercase HTML, save/open profile and saved-profile sidebar, multiple ranges/editor, six tabs, Ping/Trace, notes/history/statistics, Copy IP/hostname clipboard, monitoring/Stop, hostname Single Host with retained profile ranges, explicit interface remapping, invalid range recovery, F5 during scan, bounded close, immediate and persisted RU/EN/system-language mapping.
+
+Local diagnostic reports: build/validation/linux-rc2-native.log, linux-rc2-packed-gui.log, linux-rc2-gui-results.json, linux-rc2-window.png and dist/linux-candidate-validation.json. The image is a private validation capture, not the final GitHub screenshot. Owned virtual network fixtures were removed after the tests; temporary GUI/configuration directories are cleaned after fetching results.
+
+Reproduce GUI tests against an already cross-built application:
 
 ```sh
-GTK_MODULES=gail:atk-bridge dbus-run-session -- python3 tools/test-linux-gui.py --binary /path/to/LookLAN.sh
+dbus-run-session -- python3 tools/test-linux-gui.py --binary /path/to/LookLAN.sh
 ```
 
-Dependencies: `python3-pyatspi`, `python3-xlib`, `python3-pil`, `xvfb`, `xdotool`, `openbox`, GTK 3. The script creates its own Xvfb/D-Bus session, configuration and artifact directory. Tests include short scans of the selected local IPv4 subnet and the default gateway.
+Dependencies: GTK 3, python3-pyatspi, python3-xlib, python3-pil, Xvfb, xdotool, Openbox. The driver creates its own GUI session and temporary configuration, and performs short own-subnet and gateway scans. Native tests are tests/posix_runtime_tests.c, compiled on Windows by tools/build-ports-windows.py.
 
-## Fixes / Исправления
+Ubuntu 22.04 remains a compilation baseline, not a verified runtime. Physical NIC unplug, physical HiDPI displays and hours-long LAN stress are not represented by these VM tests. Missing-interface behavior and two-miss/state logic are checked independently. Locale mapping uses environment locales, not a separately installed Russian desktop. NBNS wire parsing is tested; a live Windows NBNS server/non-ASCII OEM conversion is not claimed. Non-ASCII OEM names remain unknown; mDNS/active IPv6 and persistent disk history are outside current scope.
 
-F5 during a running Linux scan previously opened an empty error dialog; the GUI test reproduced this on port.1. The scan callback now ignores requests while scanning, closing or without a selected interface. Uppercase export extensions now select the expected report format. Linux toolbar captions are retained alongside symbols and translated tooltips describe shortcuts. Shared OS guessing requires an actual nonzero TTL before combining it with SSH/latency to suggest Linux; unknown TTL no longer acts as Linux evidence. A portable regression covers unknown versus known TTL.
-
-## Release gate / Условия публикации
-
-The implemented Linux workflows are tested, but the port still lacks remote DNS/NetBIOS, standalone Ping/Trace, automatic monitoring, profile editor, remote context actions, device notes/history UI and statistics. Export/profile file I/O is synchronous. Ubuntu 22.04 is the compilation baseline, not a tested runtime environment. Interface loss, ICMP-blocked real hosts, stale-cache live fixtures and hours-long stress remain outside this run.
-
-По последнему указанию пользователя новые Linux preview artifacts не публикуются. Завершение проверки текущих функций не означает полную готовность по ТЗ. Linux stable остаётся закрыт до завершения портирования и соответствующих тестов.
-
-macOS: the user confirmed port.1 startup and real LAN discovery with a screenshot. Mac version/CPU and the full native test matrix were not provided; do not count that report as two-architecture validation. port.2 needs its own native user test.
+macOS: the user confirmed old port.1 startup and real discovery. New universal rc.2, Cocoa layout, routing events, Ping/Trace and full workflows still require user native results. The final DMG integrity report is dist/ports-package.json. Neither port candidate is uploaded to GitHub; stable publication requires exact-artifact native validation and final release screenshots.

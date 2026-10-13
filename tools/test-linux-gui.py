@@ -47,14 +47,26 @@ def find(role,name=None):
   if a.getRoleName()==role and (name is None or a.name==name):return a
  raise LookupError((role,name))
 def click(name):
- a=find('button',name);a.queryAction().doAction(0);time.sleep(.15)
+ try:a=find('button',name)
+ except LookupError:a=find('menu item',name)
+ a.queryAction().doAction(0);time.sleep(.15)
 def inputs():return [a for a in nodes() if a.getRoleName()=='text' and a.getState().contains(pyatspi.STATE_EDITABLE)]
 def set_range(s):inputs()[0].queryEditableText().setTextContents(s)
 def cells():
  t=find('table').queryTable()
- return [[t.getAccessibleAt(r,c).name for c in range(t.nColumns)] for r in range(t.nRows)]
+ result=[]
+ states={'ONLINE','OFFLINE','NEW','CHANGED','UNKNOWN','В СЕТИ','НЕ В СЕТИ','НОВЫЙ','ИЗМЕНЁН','НЕИЗВЕСТНО'}
+ for r in range(t.nRows):
+  row=[]
+  for c in range(t.nColumns):
+   cell=t.getAccessibleAt(r,c);value=cell.name.strip()
+   if c==0:value=next((a.name.strip() for a in descendants(cell) if a.name.strip() in states),value)
+   row.append(value)
+  result.append(row)
+ return result
 def ready():return any(a.getRoleName()=='label' and a.name.startswith(('Ready |','Готово |')) for a in nodes())
 def close():
+ subprocess.run(['xdotool','key','Escape'],check=True);time.sleep(.1)
  d=display.Display();wids=subprocess.check_output(['xdotool','search','--name','^Look@LAN-ng']).split()
  for wid in wids:
   w=d.create_resource_object('window',int(wid));atom=d.intern_atom('WM_DELETE_WINDOW')
@@ -63,7 +75,17 @@ def close():
 def start(lang='en_US.UTF-8',caption='Scan'):
  env=os.environ.copy();env['LANG']=lang;env['LC_ALL']=lang
  f=open(root/'gui.log','a');p=subprocess.Popen([str(binary)],env=env,stdout=f,stderr=f)
- wait(lambda:find('button',caption));return p
+ def mapped():
+  d=display.Display()
+  try:
+   for w in d.screen().root.query_tree().children:
+    children=[w]+list(w.query_tree().children)
+    for child in children:
+     prop=child.get_full_property(d.intern_atom('_NET_WM_PID'),X.AnyPropertyType)
+     if prop is not None and int(prop.value[0])==p.pid and child.get_attributes().map_state==X.IsViewable:return True
+   return False
+  finally:d.close()
+ wait(mapped);time.sleep(.3);wait(lambda:find('button',caption));return p
 def choose_language(name):
  combo=[a for a in nodes() if a.getRoleName()=='combo box' and a.name in ('System / Система','English','Русский')][0]
  combo.queryAction().doAction(0);time.sleep(.1)
@@ -87,6 +109,20 @@ def file_dialog(path):
   for a in nodes():
    try:print(a.getRoleName(),repr(a.name),a.queryText().getText(0,-1) if a.getRoleName()=='text' else '',flush=True)
    except Exception:pass
+def dialog_window(title):
+ return wait(lambda:subprocess.check_output(['xdotool','search','--onlyvisible','--name','^'+title+'$']).split()[-1].decode())
+def fill_dialog(title,values):
+ wid=dialog_window(title);subprocess.run(['xdotool','windowfocus',wid],check=True)
+ for i,value in enumerate(values):
+  subprocess.run(['xdotool','key','ctrl+a'],check=True);subprocess.run(['xdotool','type','--clearmodifiers',value],check=True)
+  if i+1<len(values):subprocess.run(['xdotool','key','Tab'],check=True)
+ subprocess.run(['xdotool','key','Return'],check=True);time.sleep(.5)
+ wait(lambda:subprocess.run(['xdotool','search','--onlyvisible','--name','^'+title+'$'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode!=0)
+def selected_ip(ip):
+ r=next(i for i,row in enumerate(cells()) if row[1]==ip);find('table').queryTable().addRowSelection(r);time.sleep(.15)
+def right_click(ip,label):
+ r=next(i for i,row in enumerate(cells()) if row[1]==ip);rect=find('table').queryTable().getAccessibleAt(r,1).queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
+ subprocess.run(['xdotool','mousemove',str(rect.x+20),str(rect.y+rect.height//2),'click','3'],check=True);time.sleep(.2);find('menu item',label).queryAction().doAction(0);time.sleep(.3)
 x=subprocess.Popen(['Xvfb','-displayfd','1','-screen','0','1280x800x24','-nolisten','tcp'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
 os.environ['DISPLAY']=':'+x.stdout.readline().strip()
 p=None;wm=None
@@ -107,7 +143,7 @@ try:
  for ext in ['csv','txt','html','HTML']:
   click('Export');file_dialog(root/('export.'+ext));check((root/('export.'+ext)).exists(),'Export '+ext)
  click('Save profile');file_dialog(root/'saved.lanprofile');check((root/'saved.lanprofile').exists(),'Save UTF-8 profile')
- click('Open profile');file_dialog(root/'saved.lanprofile');wait(ready);check(inputs()[0].queryText().getText(0,-1)==own+'-'+own,'Open saved profile restores range')
+ wait(lambda:any(a.name=='Default' for a in nodes()));check(True,'Saved profile appears in sidebar');click('Open profile');file_dialog(root/'saved.lanprofile');wait(ready);check(inputs()[0].queryText().getText(0,-1)==own+'-'+own,'Open saved profile restores range')
  data=(root/'export.HTML').read_text(encoding='utf-8');check('<html' in data.lower(),'Uppercase HTML extension selects HTML')
  gateway=subprocess.check_output(['ip','-j','route','show','default'],text=True);gateway=json.loads(gateway)[0]['gateway']
  set_range(gateway);click('Scan');wait(ready,20);check(any(r[1]==gateway and r[0]=='ONLINE' for r in cells()),'Real gateway scan')
@@ -119,11 +155,34 @@ try:
  wid=subprocess.check_output(['xdotool','search','--name','^Look@LAN-ng']).split()[-1].decode();subprocess.run(['xdotool','windowfocus',wid,'key','F5'],check=True);time.sleep(.3)
  check(not any(a.getRoleName()=='alert' for a in nodes()),'F5 during active scan does not show error')
  click('Stop');wait(ready);check(True,'Stop returns to idle')
+ click('Profile');fill_dialog('Profile',['GUI profile',own+';'+gateway,'22','100','100','8','5','Profile note']);check(inputs()[0].queryText().getText(0,-1)=='','Profile editor applies multiple ranges')
+ click('Scan');wait(ready);check(len(cells())==2,'Scan uses both profile ranges')
+ check(all(any(a.name==name for a in nodes()) for name in ['General','Ports','Ping','Trace','History','Log']),'Six detail tabs present');selected_ip(own);click('Ping');wait(ready);check(True,'GUI Ping completes without blocking')
+ click('Trace');wait(ready);check(True,'GUI Trace completes without blocking')
+ selected_ip(own);click('Notes');fill_dialog('Notes',['GUI device note']);selected_ip(gateway);selected_ip(own)
+ texts=[a.queryText().getText(0,-1) for a in nodes() if a.getRoleName()=='text' and not a.getState().contains(pyatspi.STATE_EDITABLE)]
+ check(any('GUI device note' in s for s in texts),'Device notes displayed in details')
+ for title in ['Statistics','History']:
+  click(title);wid=dialog_window(title);subprocess.run(['xdotool','windowfocus',wid,'key','Escape'],check=True);time.sleep(.3);wait(ready);check(True,title+' dialog opens and closes')
+ right_click(own,'Copy IP')
+ import gi
+ gi.require_version('Gtk','3.0');gi.require_version('Gdk','3.0')
+ from gi.repository import Gtk,Gdk
+ Gtk.init([]);check(Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text()==own,'Context Copy IP clipboard')
+ right_click(own,'Copy hostname');check(bool(Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text()),'Context Copy hostname clipboard')
+ click('Monitoring');wait(lambda:find('label','Monitoring | 2 / 2 | Hosts: 2'),15);click('Stop');wait(ready);check(True,'GUI monitoring starts and Stop disables schedule')
+ click('Single host');fill_dialog('Single host',['localhost']);wait(ready);check(any(row[1]=='127.0.0.1' for row in cells()),'Single hostname resolves and scans');check(inputs()[0].queryText().getText(0,-1)=='','Single host preserves profile ranges')
+ imported=root/'missing-interface.lanprofile';data=(root/'saved.lanprofile').read_text(encoding='utf-8');import re;data=re.sub(r'(?m)^interface_id=.*$', 'interface_id=missing-looklan-test',data);imported.write_text(data,encoding='utf-8');click('Open profile');file_dialog(imported);wid=dialog_window('Profile interface unavailable');subprocess.run(['xdotool','windowfocus',wid],check=True);click('Use selected interface');wait(ready);check(inputs()[0].queryText().getText(0,-1)==own+'-'+own,'Imported profile requires explicit interface remapping')
  set_range(subnet);click('Scan');time.sleep(.2);t=time.monotonic();close();check(p.wait(timeout=5)==0,'Close during scan exits cleanly');check(time.monotonic()-t<3,'Close during scan bounded under 3s');p=None
  p=start();choose_language('Русский');wait(lambda:find('button','Сканировать'));check(True,'Immediate Russian UI switch');close();check(p.wait(timeout=5)==0,'Idle close');p=None;time.sleep(.3)
  p=start(caption='Сканировать');check(True,'Saved Russian overrides English system locale');choose_language('System / Система');wait(lambda:find('button','Scan'));close();p.wait(timeout=5);p=None;time.sleep(.3)
  p=start('ru_RU.UTF-8','Сканировать');check(True,'Russian system locale selects Russian');choose_language('English');wait(lambda:find('button','Scan'));close();p.wait(timeout=5);p=None;time.sleep(.3)
  p=start('ru_RU.UTF-8','Scan');check(True,'Saved English overrides Russian system locale');choose_language('System / Система');close();p.wait(timeout=5);p=None
+except Exception:
+ from PIL import ImageGrab
+ ImageGrab.grab().save(root/'failure.png')
+ print(subprocess.check_output(['xdotool','search','--name','^Look@LAN-ng'],text=True),flush=True)
+ raise
 finally:
  if p and p.poll() is None:p.terminate();p.wait(timeout=5)
  if wm:wm.terminate();wm.wait(timeout=5)

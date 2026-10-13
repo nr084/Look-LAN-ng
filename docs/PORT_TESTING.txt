@@ -1,63 +1,60 @@
-Look@LAN-ng 1.2.0-port.2 — native macOS / Ubuntu development ports
-© nr084, build year
+Look@LAN-ng 1.3.0-rc.2 — local release candidate / локальный кандидат
+© nr084, build year / год сборки
 
 Русский
-Это первая тестовая сборка порта, не полная замена Windows 1.2.0.
-Реализованы: выбор IPv4-интерфейса/диапазона, фоновое ICMP/TCP discovery,
-остановка/безопасное закрытие, MAC из системного ARP-кэша после подтверждения
-узла, OUI, quick TCP-порты, таблица/фильтр/сведения, повторные scan states,
-открытие/сохранение UTF-8 профилей, CSV/TXT/HTML export, RU/EN/system language.
-Имя собственного компьютера определяется локально; DNS/NetBIOS других узлов,
-отдельные Ping/Trace, автоматический monitoring, профильный редактор,
-контекстные remote actions, notes/history UI и статистика пока не перенесены.
-Отсутствие устройства в таблице не доказывает, что оно выключено: ICMP может
-быть ограничен ОС, а discovery использует TCP fallback, без fresh ARP API.
+Кандидат не опубликован на GitHub. Для публикации требуются проверки именно
+этой сборки; подтверждение работы предыдущей port.1 не заменяет их.
 
-macOS 13+: перенесите Look@LAN-ng.app из DMG в свою папку или Applications.
-Приложение подписано ad-hoc, не notarized. Если macOS блокирует запуск,
-используйте системное «Всё равно открыть». Разрешите доступ к локальной сети.
-Выберите Ethernet/Wi-Fi, нажмите Scan. Проверьте RU/EN, размер окна,
-фильтр, экспорт, повторное сканирование, Stop и закрытие во время scan.
-Smoke-test.command запускает hidden own-IP integration, exit 0=passed,
-77=нет активного IPv4. Можно запустить вручную:
-./Look@LAN-ng.app/Contents/MacOS/Look@LAN-ng --smoke-test
-Проверьте как mount DMG, так и приложение после копирования из него.
-Universal содержит Intel x86_64 и Apple Silicon arm64; native тесты на Mac
-здесь не выполнялись. Пользователь подтвердил запуск и LAN scan port.1;
-новый port.2 требует отдельного теста. Settings: ~/Library/Application Support/LookLAN-ng/.
+Оба порта: дерево сетей/сохранённых профилей; выбор IPv4-интерфейса; несколько
+диапазонов; фоновое ARP/ICMP/TCP discovery; асинхронный reverse DNS→NBNS;
+OUI; вероятностная ОС; common/custom TCP-порты; numeric сортировка; фильтр;
+General/Ports/Ping/Trace/History/Log; notes текущей сессии; автоматический
+monitoring; Single Host по IPv4/имени; context actions; редактор/UTF-8 профили;
+фоновый атомарный CSV/TXT/HTML export; RU/EN/system и сохранение языка.
+Старый ARP-кэш показывает UNKNOWN, только свежий ответ подтверждает ONLINE.
+При недоступном интерфейсе импортированного профиля требуется явный выбор.
 
-Ubuntu 22.04+ Desktop x64: распакуйте ZIP и запустите ./LookLAN.sh.
-Нужны системные GTK 3 libraries (libgtk-3-0), GUI session и обычный пользователь.
-Если распаковщик потерял execute mode: chmod +x LookLAN.sh 'Look@LAN-ng'.
-Ubuntu 26.04.1 x64: native core/backend и GTK GUI проверены на VM обычным
-пользователем, включая UPX binary, Stop/Close, языки, профили и экспорт.
-Ubuntu 22.04 остаётся cross-build baseline, на ней runtime не проверялся.
-Linux development ZIP не публикуется; релиз ожидает завершения портирования.
-Settings: ${XDG_CONFIG_HOME:-~/.config}/LookLAN-ng/.
+Ubuntu 22.04+ Desktop x64: распакуйте ZIP, запустите ./LookLAN.sh.
+Нужны системные GTK 3 libraries (libgtk-3-0), графическая сессия и обычный
+пользователь. Если распаковщик потерял права: chmod +x LookLAN.sh 'Look@LAN-ng'.
+Native тесты выполняются на Ubuntu 26.04.1 x64 VM; 22.04 — только build baseline.
+Настройки: ${XDG_CONFIG_HOME:-~/.config}/LookLAN-ng/.
+
+macOS 13+: скопируйте содержимое DMG в доступную для записи папку.
+Look@LAN-ng.app universal: Intel x86_64 + Apple Silicon arm64.
+Подпись ad-hoc; нотариализации нет. Разрешите доступ к локальной сети.
+Smoke-test.command проверяет собственный IP (0=успех, 77=нет активного IPv4).
+Native-tests.command запускает дополнительные сетевые/файловые проверки
+в изолированной временной конфигурации и сохраняет Native-tests.log рядом.
+Проверьте вручную: монтаж DMG; запуск после копирования; собственный IP и
+шлюз; имена/MAC/производителей; Ping/Trace; несколько диапазонов; monitoring;
+Stop/закрытие во время scan; RU/EN/system; resize/колонки; профиль/save/open;
+сохранённый профиль в дереве; Notes; фильтр; CSV/TXT/HTML; context actions.
+Пришлите журнал Native-tests.log и скриншот главного окна. Эта версия ещё
+не проверена на настоящем Mac. ARP route notifications и системный traceroute
+особенно требуют native подтверждения. На Mac timeout Trace округлён вверх
+до целой секунды: таков интерфейс системного traceroute. Полную проверку обеих архитектур
+нельзя вывести из запуска на одной. Настройки приложения:
+~/Library/Application Support/LookLAN-ng/; геометрия — NSUserDefaults.
 
 English
-This is the first port preview, with incomplete Windows feature parity.
-Implemented: IPv4 interface/range selection, background ICMP/TCP discovery,
-Stop/safe close, post-confirmation MAC cache lookup, OUI, quick TCP ports,
-table/filter/details, repeat-scan states, UTF-8 profiles, CSV/TXT/HTML export,
-Russian/English/system language selection and saved preferences.
-Remote DNS/NetBIOS, standalone Ping/Trace, automatic monitoring, profile editor,
-remote context actions, notes/history UI and statistics are not ported yet.
-An absent host may still be alive: ICMP restrictions and TCP fallback differ
-from Windows fresh-ARP discovery.
+This candidate is local only. Native validation must match this exact artifact;
+previous port.1 startup confirmation does not validate the new functionality.
+Both ports implement interface/profile trees, multiple IPv4 ranges, background
+ARP/ICMP/TCP discovery, async reverse DNS→NBNS, OUI, probable OS, common/custom
+TCP ports, numeric sorting/filtering, six details tabs, session notes/history,
+automatic monitoring, single IPv4/hostname, context actions, profile editor,
+UTF-8 profiles and atomic background CSV/TXT/HTML export, RU/EN/system language.
+Cached neighbors alone are UNKNOWN; fresh responses prove ONLINE. Missing
+profile interfaces require explicit selection. NetBIOS non-ASCII OEM names
+remain unknown; mDNS, IPv6 active scan and persistent disk history are excluded.
 
-macOS 13+: copy Look@LAN-ng.app out of the DMG before launching. The bundle is
-ad-hoc signed, not notarized. Use the system Open Anyway option if blocked,
-and allow local network access. Test mounting, launching, both languages,
-resizing, filtering, export, rescan, Stop and close during a scan.
-Smoke-test.command runs a hidden own-IP integration check: 0=passed,
-77=no active IPv4. Universal includes Intel x86_64 and Apple Silicon arm64;
-The user confirmed startup and real LAN discovery for port.1 on a Mac.
-The full native matrix and the new port.2 binary still need Mac testing.
-
-Ubuntu 22.04+ Desktop x64: extract and run ./LookLAN.sh. System GTK 3 libraries
-(libgtk-3-0) and a GUI session are required. Native tests passed on Ubuntu
-26.04.1 x64, including packed startup and GTK workflows; 22.04 runtime is
-not verified. New Linux development ZIPs are withheld until a complete tested
-release. If execute modes are lost, chmod +x the launcher
-and binary. UPX decisions and SHA-256 are recorded in ports-package.json.
+Ubuntu 22.04+ Desktop x64: extract and run ./LookLAN.sh with system GTK 3.
+Native tests use an Ubuntu 26.04.1 x64 VM; 22.04 runtime is not verified.
+macOS 13+: copy the universal application out of the DMG, allow local network
+access, run Smoke-test.command and Native-tests.command from a writable copy.
+Send Native-tests.log and a main-window screenshot, and check the workflows
+listed above. New macOS native results, route notifications and traceroute
+are pending. The bundle is ad-hoc signed and not notarized. UPX is used where
+supported; Mach-O is preserved if stable UPX rejects it, with LZMA DMG instead.
+Notes/history are session-only. No new ports are published before validation.

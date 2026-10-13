@@ -3,14 +3,15 @@ $ErrorActionPreference='Stop'
 if($Version -notmatch '^\d+\.\d+\.\d+([-.][A-Za-z0-9.]+)?$'){throw 'Invalid release version'}
 $repository='nr084/Look-LAN-ng';$tag='v'+$Version
 $files=@($Assets | ForEach-Object {Get-Item -LiteralPath $_});if(!$files.Count){throw 'No release assets'}
-$linuxFiles=@($files | Where-Object Name -like 'look@lan-ng-linux-*.zip')
-if($linuxFiles.Count){
-    if($Prerelease){throw 'Linux preview publication is disabled by the user; publish only a completed, validated Linux release.'}
-    $proofPath=Join-Path $PSScriptRoot '../dist/linux-release-validation.json'
-    if(!(Test-Path -LiteralPath $proofPath)){throw 'Linux release validation report is missing.'}
+foreach($platform in @('linux','macos')){
+    $portFiles=@($files | Where-Object { $_.Name -like ('look@lan-ng-'+$platform+'-*') })
+    if(!$portFiles.Count){continue}
+    if($Prerelease -or $Version -match '[-]'){throw 'Port preview publication is disabled by the user; publish only completed, validated ports.'}
+    $proofPath=Join-Path $PSScriptRoot ('../dist/'+$platform+'-release-validation.json')
+    if(!(Test-Path -LiteralPath $proofPath)){throw ($platform+' release validation report is missing.')}
     $proof=Get-Content -LiteralPath $proofPath -Raw -Encoding utf8 | ConvertFrom-Json
-    if($proof.version -ne $Version -or $proof.native_tests -ne 'passed' -or $proof.feature_complete -ne $true){throw 'Linux release is not complete and natively validated.'}
-    foreach($file in $linuxFiles){if($proof.assets.($file.Name) -ne (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant()){throw 'Linux validation report does not match the release artifact.'}}
+    if($proof.version -ne $Version -or $proof.native_tests -ne 'passed' -or $proof.feature_complete -ne $true){throw ($platform+' release is not complete and natively validated.')}
+    foreach($file in $portFiles){if($proof.assets.($file.Name) -ne (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant()){throw ($platform+' validation report does not match the release artifact.')}}
 }
 if(@($files.Name | Select-Object -Unique).Count -ne $files.Count){throw 'Duplicate asset names'}
 $notes=Get-Content -LiteralPath $NotesFile -Raw -Encoding utf8

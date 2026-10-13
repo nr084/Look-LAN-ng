@@ -33,6 +33,12 @@
 
 GitHub release v1.2.0 опубликован с тремя ZIP, каждый содержит один architecture-specific EXE. 45/45 CTest и 12/12 packed smokes passed; ARM64 native Windows 11, x86/x64 Windows Server 2022. NetBIOS GROUP flag проверяется непосредственно в wire byte; Release/Debug ARM64 и high/low byte regression passed. CI: https://github.com/nr084/Look-LAN-ng/actions/runs/38256307207 .
 
-## Unix preview status
+## Unix candidate status — 13 October 2026
 
-macOS and Ubuntu now have locally cross-compiled native frontends/backend with incomplete Windows parity. Windows table above remains the Windows status. See PORT_TESTING.txt for missing DNS/NetBIOS, diagnostics, automatic monitoring, editor/context/history/statistics/complete layout. User confirmed Mac port.1 startup/discovery. Ubuntu 26.04.1 x64 native core/backend and GTK workflows passed; docs/LINUX_VALIDATION.md records the actual checks and gaps. New Linux preview publication is prohibited; stable release remains gated on completion and validation.
+Windows implementation/validation above describes the existing Windows release; it is not a claim of native Mac validation. Linux/macOS now share the missing DNS/NetBIOS, Ping/Trace, automatic monitoring, Single Host, profile editor/remapping, context actions, session notes/history/log/statistics and asynchronous transactional file I/O. Native network/profile sidebars and General/Ports/Ping/Trace/History/Log tabs are present. Monitoring no longer repeats service scans; scan Ping samples enter history. Default concurrency is 64 with configurable 8–256.
+
+Linux Ubuntu 26.04.1 x64: six native C suites, scoped DNS/cache/generation tests, timed monitoring, diagnostics, file snapshots/cancellation, fresh-ARP and static-cache fixtures, Stop/FD checks, and 38 GTK workflows passed on the private candidates. Exact final candidate artifact results and limitations are in docs/LINUX_VALIDATION.md and local build/validation reports. Ubuntu 22.04 is a cross-build baseline, not a tested runtime. Physical NIC unplug, physical HiDPI displays, live non-ASCII NBNS and hours-long LAN load are not claimed as tested.
+
+macOS universal x86_64/arm64 compiles locally; code page/resource seals and DMG hashes/execute modes pass. User-confirmed port.1 startup/LAN scan is historical evidence only. New Cocoa layout, fresh routing notifications, diagnostics and full candidate workflows need user native results. Native-tests.command and the manual checklist accompany the local candidate.
+
+The candidate is withheld from GitHub. Both Linux and macOS stable publication are gated on completion and exact-artifact native evidence. Future mDNS, active IPv6 and persistent disk history remain outside the current release scope. Non-ASCII OEM NetBIOS names are shown as unknown rather than guessed. Final Windows/Linux screenshots are captured only from final release binaries; user supplies macOS.
