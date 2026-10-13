@@ -6,9 +6,11 @@ Linux x64 **1.3.0 stable** is built locally on Windows, maximally UPX-packed and
 
 The Unix audit additionally removed all strcpy/sprintf calls from src, added a bounded non-truncating text helper, fixed PTR CNAME/case handling, source/MAC snapshot locking, sparse port profile round-trips above 8 KiB with a 64 KiB serialization limit and full Unicode Windows field reads. Workers are capped by actual target count. Both ports now have a native log table exposing the complete 10000-event ring. Windows regression: all 15 test cases passed; profile/UI/file tests rerun after fixing the newly exposed parser limit. Historical failed test outputs are retained privately.
 
-Public Windows remains stable 1.2.0 (three architecture ZIPs). Linux 1.3.0 is a separate stable release containing one tested Linux ZIP. macOS universal **1.3.0-rc.3** remains local; code/resource seals and DMG extraction/modes passed. Its native test still needs the user. Do not publish macOS based on cross-compilation or the old port.1 screenshot. macOS final screenshot is also pending from the user.
+Public Windows remains stable 1.2.0 (three architecture ZIPs). Linux 1.3.0 is a separate stable release containing one tested Linux ZIP. macOS universal **1.3.0-rc.4** remains local; code/resource seals and DMG extraction/modes passed. Its native test still needs the user. Do not publish macOS based on cross-compilation or the old port.1 screenshot. macOS final screenshot is also pending from the user.
 
 Linux release proof: dist/linux-release-validation.json; native logs and screenshots in build/validation and docs/images. Publisher gates exact asset SHA/native-pass/feature-complete. Non-ASCII OEM NBNS names remain unknown; mDNS/active IPv6 are future scope. Ubuntu 22.04 runtime and physical HiDPI/NIC-unplug are not claimed as tested. Native monitoring is a 10-minute bounded check, not hours/days of GUI stress.
+
+macOS rc.4 adds modal/shutdown guards, consistent command validation, adaptive top controls, coalesced scan-table updates and hardened Darwin traceroute process/output handling. Both architectures cross-build; application and six universal test binaries pass signature/hash checks and DMG roundtrip/execute-mode verification. DMG SHA-256: `f4c01a8bab97e8744235b4fd315bf2430157b501384e19da44d037e3ecff420e`. User will provide Mac access later; native tests and final screenshot remain pending. Checklist/evidence: docs/MACOS_VALIDATION.md. Packaging now supports independent targets and refuses repacking a published Linux version; Linux ZIP/hash unchanged.
 
 
 ---

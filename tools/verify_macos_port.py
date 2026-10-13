@@ -3,7 +3,7 @@
 This verifies structural/hash integrity, not Gatekeeper policy or native execution.
 CodeDirectory layout: apple-oss-distributions/xnu/osfmk/kern/cs_blobs.h.
 """
-import hashlib,json,plistlib,struct,sys
+import hashlib,json,plistlib,re,struct,sys
 from pathlib import Path
 
 def slices(data):
@@ -60,6 +60,8 @@ def verify_binary(path,bundle=None):
 
 def verify_bundle(path):
     app=Path(path);info=plistlib.loads((app/'Contents/Info.plist').read_bytes());exe=app/'Contents/MacOS'/info['CFBundleExecutable'];verify_binary(exe,app)
+    assert re.fullmatch(r'[0-9]+(?:\.[0-9]+){0,2}',info['CFBundleVersion']),'Invalid numeric bundle build version'
+    assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+',info['CFBundleShortVersionString']),'Invalid public bundle version'
     resources=plistlib.loads((app/'Contents/_CodeSignature/CodeResources').read_bytes())
     for name,entry in resources.get('files2',{}).items():
         p=(app/'Contents'/name).resolve();assert p.is_relative_to((app/'Contents').resolve()),'Escaping resource path'

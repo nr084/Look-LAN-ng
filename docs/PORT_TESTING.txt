@@ -1,4 +1,4 @@
-Look@LAN-ng 1.3.0-rc.3 — local release candidate / локальный кандидат
+Look@LAN-ng 1.3.0-rc.4 — local release candidate / локальный кандидат
 © nr084, build year / год сборки
 
 Русский
