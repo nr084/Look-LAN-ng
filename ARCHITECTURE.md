@@ -70,7 +70,7 @@ DNS update отделён от confirmed discovery: он может измени
 
 Toolbar glyphs: win_toolbar_icons.c, original GDI geometry rendered at 4x then HALFTONE downsample. Every temporary DC/bitmap/pen/brush is released per draw; DPI smoke renders all six enabled/disabled glyphs over 100 transitions and checks GDI/USER resource counts. UI language preference system/ru/en is separate from resolved russian flag; system follows GetUserDefaultUILanguage at startup and explicit menu selection persists immediately.
 
-## Unix ports: local 1.3.0 candidate
+## Unix ports: Linux 1.3.0 / local macOS candidate
 
 The shared POSIX controller owns the host model, monitoring, details, profiles and reports on the UI thread. Linux uses GTK 3; macOS uses Cocoa/SF Symbols. Both expose interface/profile trees, numeric sorting/filtering, six detail tabs, profile editing, diagnostics, statistics, notes and native context actions. Linux rows retain model indices and receive incremental updates; Cocoa uses native table virtualization. Geometry/columns and RU/EN/system preferences are saved locally.
 
@@ -85,3 +85,5 @@ The shared POSIX controller owns the host model, monitoring, details, profiles a
 `desktop_io` owns immutable export/profile snapshots. Workers parse bounded UTF-8 profiles, list up to 64 managed profiles, and write same-directory temporary files followed by flush/fsync/atomic rename. Cancellation removes owned temporaries and preserves the destination before commit. Missing imported interfaces require explicit user reassignment; failed parsing leaves current settings intact. UI close cancels/reaps all jobs through timers and releases model storage only after joins.
 
 Compilation/packaging are local on Windows. Linux ELF uses PIE, full RELRO and a non-executable stack, then maximum stable UPX and native packed tests. Universal Mach-O retains ad-hoc code/resource seals when stable UPX rejects the format; DMG uses HFS+/LZMA with extracted hash/mode validation. Publication requires native evidence matching the final artifact; no port previews are published.
+
+The full 10000-entry log ring is exposed by native GTK/Cocoa tables. GTK appends new sequence-numbered rows and evicts old rows; Cocoa reads ring-backed cells. Sparse port text uses a shared 64 KiB limit, bounded serialization and complete Unicode editor reads. PTR alias records are followed with a bounded, case-insensitive chain. All src text copies use bounded functions.

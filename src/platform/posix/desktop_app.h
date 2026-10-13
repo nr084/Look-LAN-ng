@@ -33,6 +33,7 @@ bool desktop_monitor(desktop_app_t *app,const char *range);
 void desktop_stop(desktop_app_t *app);
 bool desktop_profile_configure(desktop_app_t *app,const char *name,const char *ranges,const char *ports,unsigned icmp,unsigned tcp,unsigned concurrency,unsigned interval,const char *notes);
 void desktop_statistics_text(const desktop_app_t *app,char *out,size_t capacity);
+void desktop_log_cell(const desktop_app_t *app,size_t row,unsigned column,char *out,size_t capacity);
 void desktop_history(const desktop_app_t *app,char *out,size_t capacity);
 bool desktop_diagnostic(desktop_app_t *app,uint32_t ip,bool trace);
 void desktop_detail(const desktop_app_t *app,size_t index,char *out,size_t capacity);

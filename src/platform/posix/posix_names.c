@@ -1,3 +1,4 @@
+#include "text.h"
 #include "posix_names.h"
 #include "nbns.h"
 #include <sys/socket.h>
@@ -28,10 +29,24 @@ static bool decode(const uint8_t *p,size_t n,size_t *at,char out[256]){
 }
 bool posix_ptr_reply(const uint8_t *p,size_t n,uint32_t ip,uint16_t tx,char name[256]){
     if(n<12 || word(p)!=tx || (word(p+2)&0x800f)!=0x8000 || (word(p+2)&0x7a00) || word(p+4)!=1 || word(p+6)>64)return false;
-    size_t at=12;char value[256],expected[64];query_name(ip,expected);
-    if(!decode(p,n,&at,value) || strcmp(value,expected) || n-at<4 || word(p+at)!=12 || word(p+at+2)!=1)return false;at+=4;
-    for(unsigned i=0;i<word(p+6);++i){if(!decode(p,n,&at,value) || n-at<10)return false;unsigned type=word(p+at),cls=word(p+at+2),bytes=word(p+at+8);at+=10;if(bytes>n-at)return false;
-        if(type==12 && cls==1 && !strcmp(value,expected)){size_t end=at;if(!decode(p,n,&end,value) || end>at+bytes || !value[0])return false;strcpy(name,value);return true;}at+=bytes;
+    size_t at=12;char value[256],current[256];query_name(ip,current);
+    if(!decode(p,n,&at,value) || strcasecmp(value,current) || n-at<4 || word(p+at)!=12 || word(p+at+2)!=1)return false;at+=4;
+    struct record {char owner[256];size_t data;unsigned type,length;} records[64];unsigned count=0;
+    for(unsigned i=0;i<word(p+6);++i){
+        if(!decode(p,n,&at,value) || n-at<10)return false;
+        unsigned type=word(p+at),cls=word(p+at+2),bytes=word(p+at+8);at+=10;if(bytes>n-at)return false;
+        if(cls==1){lan_text_copy(records[count].owner,sizeof(records[count].owner),value);records[count].data=at;records[count].type=type;records[count++].length=bytes;}at+=bytes;
+    }
+    for(unsigned step=0;step<64;++step){
+        for(unsigned i=0;i<count;++i)if(records[i].type==12 && !strcasecmp(records[i].owner,current)){
+            size_t end=records[i].data;if(!decode(p,n,&end,value) || end!=records[i].data+records[i].length || !value[0])return false;
+            return lan_text_copy(name,256,value);
+        }
+        bool alias=false;for(unsigned i=0;i<count;++i)if(records[i].type==5 && !strcasecmp(records[i].owner,current)){
+            size_t end=records[i].data;if(!decode(p,n,&end,value) || end!=records[i].data+records[i].length || !value[0])return false;
+            lan_text_copy(current,sizeof(current),value);alias=true;break;
+        }
+        if(!alias)break;
     }return false;
 }
 size_t posix_address_request(const char *name,uint16_t tx,uint8_t p[512]){
@@ -42,9 +57,9 @@ size_t posix_address_request(const char *name,uint16_t tx,uint8_t p[512]){
 }
 bool posix_address_reply(const uint8_t *p,size_t n,const char *name,uint16_t tx,uint32_t *ip){
     if(n<12 || word(p)!=tx || (word(p+2)&0x800f)!=0x8000 || (word(p+2)&0x7a00) || word(p+4)!=1 || !word(p+6) || word(p+6)>64)return false;
-    char current[256],value[256];if(strlen(name)>=sizeof(current))return false;strcpy(current,name);size_t at=12;if(!decode(p,n,&at,value) || strcasecmp(value,name) || n-at<4 || word(p+at)!=1 || word(p+at+2)!=1)return false;at+=4;
+    char current[256],value[256];if(strlen(name)>=sizeof(current))return false;lan_text_copy(current,sizeof(current),name);size_t at=12;if(!decode(p,n,&at,value) || strcasecmp(value,name) || n-at<4 || word(p+at)!=1 || word(p+at+2)!=1)return false;at+=4;
     struct record {char name[256];size_t data;unsigned type,length;} records[64];unsigned count=0;
-    for(unsigned i=0;i<word(p+6);++i){if(!decode(p,n,&at,value) || n-at<10)return false;unsigned type=word(p+at),cls=word(p+at+2),bytes=word(p+at+8);at+=10;if(bytes>n-at)return false;if(cls==1){strcpy(records[count].name,value);records[count].type=type;records[count].length=bytes;records[count++].data=at;}at+=bytes;}
+    for(unsigned i=0;i<word(p+6);++i){if(!decode(p,n,&at,value) || n-at<10)return false;unsigned type=word(p+at),cls=word(p+at+2),bytes=word(p+at+8);at+=10;if(bytes>n-at)return false;if(cls==1){lan_text_copy(records[count].name,sizeof(records[count].name),value);records[count].type=type;records[count].length=bytes;records[count++].data=at;}at+=bytes;}
     for(unsigned step=0;step<64;++step){bool alias=false;for(unsigned i=0;i<count;++i)if(!strcasecmp(records[i].name,current) && records[i].type==1 && records[i].length==4){const uint8_t *a=p+records[i].data;*ip=((uint32_t)a[0]<<24)|((uint32_t)a[1]<<16)|((uint32_t)a[2]<<8)|a[3];return *ip!=0;}
         for(unsigned i=0;i<count;++i)if(!strcasecmp(records[i].name,current) && records[i].type==5){size_t position=records[i].data;if(!decode(p,n,&position,current) || position>records[i].data+records[i].length)return false;alias=true;break;}if(!alias)break;
     }return false;
@@ -79,6 +94,6 @@ void posix_name(posix_backend_t *b,uint32_t ip,char name[256]){
     for(size_t i=0;i<count && !posix_cancelled(b);++i)if(posix_ptr_lookup(b,ip,servers[i],53,250,name))return;
     if(posix_cancelled(b) || !nbns_request(tx,request,sizeof(request)))return;ssize_t bytes=exchange(b,ip,137,request,50,reply,300);char raw[16];
     if(bytes>0 && nbns_name(reply,(size_t)bytes,tx,raw)){/* ASCII NBSTAT names are unambiguous across OEM code pages. */
-        for(size_t i=0;raw[i];++i)if((unsigned char)raw[i]>=128)return;strcpy(name,raw);
+        for(size_t i=0;raw[i];++i)if((unsigned char)raw[i]>=128)return;lan_text_copy(name,256,raw);
     }
 }

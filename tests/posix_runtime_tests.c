@@ -28,7 +28,32 @@ static size_t dns_answer(uint32_t ip,uint16_t tx,uint8_t packet[512]){
     const uint8_t tail[]={0xc0,0x0c,0,12,0,1,0,0,0,60,0,14,4,'t','e','s','t',7,'e','x','a','m','p','l','e',0};memcpy(packet+n,tail,sizeof(tail));return n+sizeof(tail);
 }
 static void *dns_server(void *context){dns_fixture_t *f=context;uint8_t packet[512];struct sockaddr_in peer={0};socklen_t size=sizeof(peer);ssize_t bytes=recvfrom(f->socket,packet,sizeof(packet),0,(struct sockaddr *)&peer,&size);if(bytes>12){f->source_ok=ntohl(peer.sin_addr.s_addr)==f->expected;uint16_t tx=(packet[0]<<8)|packet[1];size_t n=dns_answer(f->expected,tx,packet);sendto(f->socket,packet,n,0,(struct sockaddr *)&peer,size);}return NULL;}
-int main(void){
+static size_t resident_kib(void){
+#ifdef __linux__
+    FILE *file=fopen("/proc/self/status","r");if(!file)return 0;char line[256];size_t value=0;
+    while(fgets(line,sizeof(line),file))if(sscanf(line,"VmRSS: %zu kB",&value)==1)break;
+    fclose(file);return value;
+#else
+    return 0;
+#endif
+}
+static int monitor_stress(void){
+    desktop_app_t *a=calloc(1,sizeof(*a));CHECK(a && desktop_init(a,"en_US"));CHECK(a->selected<a->interface_count);
+    char ranges[96],own[32],gateway[32];ipv4_format(a->interfaces[a->selected].ip,own,sizeof(own));uint32_t router=a->interfaces[a->selected].gateway;
+    if(router){ipv4_format(router,gateway,sizeof(gateway));snprintf(ranges,sizeof(ranges),"%s;%s",own,gateway);}else snprintf(ranges,sizeof(ranges),"%s",own);
+    CHECK(desktop_profile_configure(a,"Monitoring stress",ranges,"22",100,100,8,5,""));CHECK(desktop_monitor(a,NULL));
+    uint64_t deadline=now()+720000,last_round=0;int baseline_fd=-1;size_t baseline_rss=0,max_rss=0;unsigned samples=0;
+    while(a->monitoring && a->monitor.round<121 && now()<deadline){
+        desktop_poll(a);if(!a->scanning && !a->names_pending && a->monitor.round!=last_round){last_round=a->monitor.round;int fd=descriptors();size_t rss=resident_kib();
+            if(last_round==5){baseline_fd=fd;baseline_rss=rss;}if(last_round>=5){CHECK(fd<=baseline_fd);if(rss>max_rss)max_rss=rss;++samples;}
+            printf("MONITOR round=%llu hosts=%zu fd=%d rss_kib=%zu\n",(unsigned long long)last_round,a->host_count,fd,rss);fflush(stdout);
+        }struct timespec pause={0,50000000};nanosleep(&pause,NULL);
+    }
+    CHECK(a->monitor.round>=121 && a->monitoring && samples>=100);desktop_stop(a);CHECK(finish_scan(a));CHECK(!baseline_rss || max_rss<=baseline_rss+4096);
+    while(!desktop_close(a))pause_tick();free(a);printf("PASS 120 scheduled monitoring rounds (~10 minutes), stable FDs, RSS %zu -> max %zu KiB\n",baseline_rss,max_rss);return 0;
+}
+int main(int argc,char **argv){
+    if(argc==2 && !strcmp(argv[1],"--monitor-stress"))return monitor_stress();
     const char *fixture_interface=getenv("LOOKLAN_ARP_INTERFACE"),*fixture_target=getenv("LOOKLAN_ARP_TARGET");
     if(fixture_interface && fixture_target){desktop_app_t *fixture=calloc(1,sizeof(*fixture));CHECK(fixture && desktop_init(fixture,"en_US"));size_t selected=SIZE_MAX;for(size_t i=0;i<fixture->interface_count;++i)if(!strcmp(fixture->interfaces[i].name,fixture_interface))selected=i;CHECK(selected<fixture->interface_count && desktop_select(fixture,selected));CHECK(desktop_profile_configure(fixture,"ARP fixture",fixture_target,"22",100,100,8,5,""));CHECK(desktop_start(fixture,fixture_target) && finish_scan(fixture));uint32_t ip;CHECK(ipv4_parse(fixture_target,strlen(fixture_target),&ip));size_t found=SIZE_MAX;for(size_t i=0;i<fixture->host_count;++i)if(ipv4_value(&fixture->hosts[i].address)==ip)found=i;CHECK(found<fixture->host_count);bool cached=getenv("LOOKLAN_ARP_CACHE")!=NULL;
         if(cached)CHECK(!fixture->hosts[found].online && !fixture->hosts[found].first_seen && fixture->hosts[found].has_mac);else CHECK(fixture->hosts[found].online && fixture->hosts[found].has_mac && !fixture->hosts[found].has_latency && fixture->arp_only[found]);CHECK(getuid()!=0);while(!desktop_close(fixture))pause_tick();free(fixture);printf("PASS unprivileged %s fixture: all ICMP/TCP/UDP input blocked, ARP alone %s\n",cached ? "cached neighbor":"fresh ARP",cached ? "does not prove ONLINE":"confirms ONLINE");return 0;
@@ -43,6 +68,9 @@ int main(void){
     uint8_t packet[512];char name[256];uint32_t own=a->interfaces[a->selected].ip;size_t bytes=dns_answer(own,123,packet);
     CHECK(posix_ptr_reply(packet,bytes,own,123,name) && !strcmp(name,"test.example"));CHECK(!posix_ptr_reply(packet,bytes,own,124,name));CHECK(!posix_ptr_reply(packet,bytes-1,own,123,name));
     packet[12]=0xc0;packet[13]=12;CHECK(!posix_ptr_reply(packet,bytes,own,123,name));
+    bytes=posix_ptr_request(own,123,packet);packet[2]=0x81;packet[3]=0x80;packet[7]=2;
+    const uint8_t alias_records[]={0xc0,0x0c,0,5,0,1,0,0,0,60,0,15,5,'a','l','i','a','s',7,'r','e','v','e','r','s','e',0,5,'a','l','i','a','s',7,'r','e','v','e','r','s','e',0,0,12,0,1,0,0,0,60,0,14,4,'t','e','s','t',7,'e','x','a','m','p','l','e',0};
+    memcpy(packet+bytes,alias_records,sizeof(alias_records));CHECK(posix_ptr_reply(packet,bytes+sizeof(alias_records),own,123,name) && !strcmp(name,"test.example"));CHECK(!posix_ptr_reply(packet,bytes+sizeof(alias_records)-1,own,123,name));
     uint8_t answer[512];size_t used=posix_address_request("fixture.example",42,answer);CHECK(used);answer[2]=0x81;answer[3]=0x80;answer[7]=1;const uint8_t a_record[]={0xc0,0x0c,0,1,0,1,0,0,0,60,0,4,192,0,2,7};memcpy(answer+used,a_record,sizeof(a_record));uint32_t resolved=0;CHECK(posix_address_reply(answer,used+sizeof(a_record),"fixture.example",42,&resolved) && resolved==0xc0000207);CHECK(!posix_address_reply(answer,used+sizeof(a_record)-1,"fixture.example",42,&resolved));CHECK(!posix_address_request("name;command",1,answer));CHECK(!posix_address_request("a..b",1,answer));
     int server=socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);CHECK(server>=0);struct sockaddr_in address={0};address.sin_family=AF_INET;address.sin_addr.s_addr=htonl(own);CHECK(!bind(server,(struct sockaddr *)&address,sizeof(address)));socklen_t size=sizeof(address);CHECK(!getsockname(server,(struct sockaddr *)&address,&size));
     struct timeval receive_timeout={2,0};setsockopt(server,SOL_SOCKET,SO_RCVTIMEO,&receive_timeout,sizeof(receive_timeout));dns_fixture_t fixture={server,own,false};pthread_t thread;CHECK(!pthread_create(&thread,NULL,dns_server,&fixture));

@@ -99,9 +99,16 @@ static bool write_field(text_writer_t writer, void *ctx, const char *key, const 
     for (; *s; ++s) { const char *escape = *s == '\\' ? "\\\\" : *s == '\n' ? "\\n" : *s == '\r' ? "\\r" : NULL; if (escape ? !write_text(writer,ctx,escape) : !writer(ctx,s,1)) return false; }
     return write_text(writer,ctx,"\n");
 }
+typedef struct {text_writer_t writer;void *context;size_t count;} profile_output_t;
+static bool limited_profile_write(void *context,const char *data,size_t length){
+    profile_output_t *output=context;if(length>65536-output->count)return false;
+    if(!output->writer(output->context,data,length))return false;
+    output->count+=length;return true;
+}
 bool profile_write(const profile_t *p, text_writer_t writer, void *ctx) {
     if (!writer || !profile_validate(p,NULL,0)) return false;
-    char ports[8192], buffer[256]; if (!profile_ports_text(p,ports,sizeof(ports))) return false;
+    profile_output_t output={writer,ctx,0};writer=limited_profile_write;ctx=&output;
+    char ports[PROFILE_PORT_TEXT_CAPACITY], buffer[256]; if (!profile_ports_text(p,ports,sizeof(ports))) return false;
     if (!write_text(writer,ctx,"Look@LAN-ngProfile=1\n") || !write_field(writer,ctx,"name",p->name) || !write_field(writer,ctx,"interface_id",p->interface_id) || !write_field(writer,ctx,"interface_name",p->interface_name)) return false;
     for (size_t i = 0; i < p->range_count; ++i) { char first[32], last[32]; ipv4_format(p->ranges[i].first,first,32); ipv4_format(p->ranges[i].last,last,32); snprintf(buffer,sizeof(buffer),"range=%s-%s\n",first,last); if (!write_text(writer,ctx,buffer)) return false; }
     snprintf(buffer,sizeof(buffer),"icmp_timeout_ms=%u\ntcp_timeout_ms=%u\nmonitor_interval_sec=%u\nconcurrency=%u\n",p->icmp_timeout_ms,p->tcp_timeout_ms,p->monitor_interval_sec,p->concurrency);

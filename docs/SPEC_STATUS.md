@@ -42,3 +42,7 @@ Linux Ubuntu 26.04.1 x64: six native C suites, scoped DNS/cache/generation tests
 macOS universal x86_64/arm64 compiles locally; code page/resource seals and DMG hashes/execute modes pass. User-confirmed port.1 startup/LAN scan is historical evidence only. New Cocoa layout, fresh routing notifications, diagnostics and full candidate workflows need user native results. Native-tests.command and the manual checklist accompany the local candidate.
 
 The candidate is withheld from GitHub. Both Linux and macOS stable publication are gated on completion and exact-artifact native evidence. Future mDNS, active IPv6 and persistent disk history remain outside the current release scope. Non-ASCII OEM NetBIOS names are shown as unknown rather than guessed. Final Windows/Linux screenshots are captured only from final release binaries; user supplies macOS.
+
+## Linux stable completion — 13 October 2026
+
+Linux 1.3.0 closes the Unix implementation gaps: bounded text copies (no strcpy/sprintf in src), PTR alias handling, large sparse port profiles without editor truncation, capped workers, native full session-log table. Final packed 39/39 GTK workflows and scheduled monitoring (120 rounds, FD 6→6, RSS 11548→11680 KiB) passed. Real release screenshots for Windows 1.2.0 and Linux 1.3.0 are in docs/images and README. Linux is a separate stable release; macOS rc.3 stays local pending user native tests/screenshot. Future features and stated physical/runtime validation gaps remain explicitly separated from completed functionality.

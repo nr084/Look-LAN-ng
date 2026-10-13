@@ -1,3 +1,4 @@
+#include "text.h"
 #include "desktop_app.h"
 #include "build_info.h"
 #include <stdio.h>
@@ -38,7 +39,7 @@ bool desktop_init(desktop_app_t *a,const char *system){
     if(a->settings[0]){snprintf(a->profiles_directory,sizeof(a->profiles_directory),"%s",a->settings);char *slash=strrchr(a->profiles_directory,'/');if(slash && strlen(a->profiles_directory)+2<sizeof(a->profiles_directory))snprintf(slash,sizeof(a->profiles_directory)-(size_t)(slash-a->profiles_directory),"/profiles");else a->profiles_directory[0]=0;}
     a->language=language;a->russian=language==2 || (!language && ru_system(system));return desktop_refresh(a);
 }
-bool desktop_refresh(desktop_app_t *a){if(a->scanning || a->monitoring || a->tools || a->io)return false;a->interface_count=posix_interfaces(a->interfaces,POSIX_INTERFACES);a->selected=SIZE_MAX;a->host_count=0;for(size_t i=0;i<a->interface_count;++i)if(a->interfaces[i].automatic)return desktop_select(a,i);return true;}
+bool desktop_refresh(desktop_app_t *a){if(a->scanning || a->monitoring || a->tools || a->io)return false;a->interface_count=posix_interfaces(a->interfaces,POSIX_INTERFACES);a->selected=SIZE_MAX;a->host_count=0;size_t best=SIZE_MAX;for(size_t i=0;i<a->interface_count;++i){const posix_interface_t *nic=&a->interfaces[i];if(!nic->automatic)continue;if(best==SIZE_MAX || (nic->gateway && !a->interfaces[best].gateway) || (nic->gateway && nic->has_metric && a->interfaces[best].has_metric && nic->metric<a->interfaces[best].metric))best=i;}return best!=SIZE_MAX ? desktop_select(a,best):true;}
 bool desktop_select(desktop_app_t *a,size_t index){
     if(a->scanning || a->monitoring || a->tools || a->io || index>=a->interface_count)return false;a->selected=index;monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);
     posix_invalidate_names(&a->backend);memset(a->arp_only,0,sizeof(a->arp_only));
@@ -137,7 +138,7 @@ bool desktop_profile_configure(desktop_app_t *a,const char *name,const char *ran
     if(a->closing || a->scanning || a->monitoring || a->tools || a->io || a->selected>=a->interface_count)return false;
     profile_t *p=malloc(sizeof(*p));if(!p)return false;*p=a->profile;bool ok=name && notes && ranges && ports && strlen(name)<sizeof(p->name) && strlen(notes)<sizeof(p->notes);
     a->error[0]=0;
-    if(ok){strcpy(p->name,name);strcpy(p->notes,notes);p->range_count=0;
+    if(ok){lan_text_copy(p->name,sizeof(p->name),name);lan_text_copy(p->notes,sizeof(p->notes),notes);p->range_count=0;
         const char *first=ranges;for(const char *s=ranges;;++s)if(!*s || *s=='\n' || *s==';' || *s==','){
             if(s>first){if(p->range_count==NETWORK_MAX_RANGES || !range_parse(first,(size_t)(s-first),&p->ranges[p->range_count])){ok=false;break;}++p->range_count;}
             if(!*s)break;first=s+1;
@@ -151,6 +152,14 @@ bool desktop_profile_configure(desktop_app_t *a,const char *name,const char *ran
     free(p);return ok;
 }
 void desktop_statistics_text(const desktop_app_t *a,char *out,size_t capacity){statistics_t s=statistics_compute(a->hosts,a->host_count,a->completed);snprintf(out,capacity,"%s: %u\n%s: %zu\n%s: %zu\n%s: %zu\n%s: %zu\n%s: %zu\n\nWindows: %zu\nLinux / Unix: %zu\n%s: %zu\n%s: %zu\n",desktop_tr(a,"Scanned","Проверено"),s.scanned,desktop_tr(a,"Hosts","Узлы"),s.records,desktop_tr(a,"Online","В сети"),s.online,desktop_tr(a,"Offline","Не в сети"),s.offline,desktop_tr(a,"Unconfirmed","Неподтверждённые"),s.unknown,desktop_tr(a,"New","Новые"),s.fresh,s.windows,s.unix_hosts,desktop_tr(a,"Network devices","Сетевые устройства"),s.network_devices,desktop_tr(a,"Unknown OS","Неизвестная ОС"),s.unknown_os);}
+void desktop_log_cell(const desktop_app_t *a,size_t row,unsigned column,char *out,size_t capacity){
+    if(!capacity)return;out[0]=0;const monitor_event_t *e=monitor_log_at(&a->monitor,row);if(!e)return;
+    const char *en[]={"Scan started","Scan finished","Scan cancelled","ONLINE","OFFLINE","NEW","IP changed","MAC changed","Name changed","Scan error","Export started","Export finished","Export error"},*ru[]={"Начало сканирования","Сканирование завершено","Сканирование отменено","В СЕТИ","НЕ В СЕТИ","НОВЫЙ","Изменён IP","Изменён MAC","Изменено имя","Ошибка сканирования","Начало экспорта","Экспорт завершён","Ошибка экспорта"};
+    if(column==0)timestamp(e->timestamp,out,capacity);
+    else if(column==1)snprintf(out,capacity,"%s",(unsigned)e->type<13 ? (a->russian ? ru[e->type]:en[e->type]):"?");
+    else if(column==2 && e->host_index!=SIZE_MAX)ipv4_format(ipv4_value(&e->address),out,capacity);
+    else if(column==3)snprintf(out,capacity,"%s%s%s",e->previous,e->previous[0] ? " → ":"",e->current);
+}
 void desktop_history(const desktop_app_t *a,char *out,size_t capacity){
     if(!capacity)return;out[0]=0;size_t used=0;
     const char *en[]={"Scan started","Scan finished","Scan cancelled","ONLINE","OFFLINE","NEW","IP changed","MAC changed","Name changed","Scan error","Export started","Export finished","Export error"};

@@ -16,7 +16,7 @@ static bool number(const char *s, size_t n, size_t *p, unsigned *v) {
     *v = value; spaces(s,n,p); return true;
 }
 bool ports_parse(const char *s, size_t n, uint16_t *out, size_t cap, size_t *count) {
-    if (!s || !out || !count || !n || n > 4096) return false;
+    if (!s || !out || !count || !n || n > 65535) return false;
     uint8_t seen[8192] = {0}; size_t pos = 0, total = 0;
     while (pos < n) {
         unsigned first, last;

@@ -1,3 +1,4 @@
+#include "text.h"
 #include "desktop_io.h"
 #include "build_info.h"
 #include <pthread.h>
@@ -22,8 +23,8 @@ static void *worker(void *context){desktop_io_t *j=context;
     atomic_store(&j->done,true);return NULL;
 }
 desktop_io_t *desktop_io_start(desktop_io_kind_t kind,const char *path,const profile_t *profile,const lan_host_t *hosts,size_t count,const vendor_table_t *vendors,report_format_t format,bool russian,const char *managed_directory){
-    if(!path || strlen(path)+8>=4096 || count>65536)return NULL;desktop_io_t *j=calloc(1,sizeof(*j));if(!j)return NULL;atomic_init(&j->cancel,false);atomic_init(&j->done,false);j->kind=kind;strcpy(j->path,path);j->format=format;j->count=count;j->vendors=*vendors;j->profile=malloc(sizeof(*j->profile));if(!j->profile){free(j);return NULL;}*j->profile=*profile;
-    if(managed_directory && strlen(managed_directory)+64<sizeof(j->managed))strcpy(j->managed,managed_directory);
+    if(!path || strlen(path)+8>=4096 || count>65536)return NULL;desktop_io_t *j=calloc(1,sizeof(*j));if(!j)return NULL;atomic_init(&j->cancel,false);atomic_init(&j->done,false);j->kind=kind;lan_text_copy(j->path,sizeof(j->path),path);j->format=format;j->count=count;j->vendors=*vendors;j->profile=malloc(sizeof(*j->profile));if(!j->profile){free(j);return NULL;}*j->profile=*profile;
+    if(managed_directory && strlen(managed_directory)+64<sizeof(j->managed))lan_text_copy(j->managed,sizeof(j->managed),managed_directory);
     if(kind==DESKTOP_EXPORT && count){j->hosts=malloc(count*sizeof(*j->hosts));if(!j->hosts){free(j->profile);free(j);return NULL;}memcpy(j->hosts,hosts,count*sizeof(*hosts));}
     j->options.russian=russian;snprintf(j->options.profile_name,sizeof(j->options.profile_name),"%s",profile->name);snprintf(j->options.copyright,sizeof(j->options.copyright),"© nr084, " APP_BUILD_YEAR);
     if(pthread_create(&j->thread,NULL,worker,j)){free(j->hosts);free(j->profile);free(j);return NULL;}return j;

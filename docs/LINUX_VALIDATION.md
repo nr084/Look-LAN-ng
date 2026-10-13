@@ -1,3 +1,19 @@
+# Linux stable 1.3.0 — 13 October 2026
+
+Final locally built Windows→Linux ZIP: `look@lan-ng-linux-x64-1.3.0.zip`, SHA-256 `743a896be8fe06118c0ec1ff4cf48ea492f14d19b2395003117f8b47523c5fc2`. Tested as an ordinary user on Ubuntu 26.04.1 x64 VM: six native suites and **39/39 final packed GTK workflows**, including the full native log table and actual Close via the window manager. Own-IP packed smoke and real default-subnet discovery passed. The final screenshot shows **11 actually discovered hosts**; it is not a sample fixture.
+
+**120 scheduled monitoring rounds (~10 minutes)** on own IP and gateway: FDs **6 → 6**, RSS **11548 → max 11680 KiB**, within the expected bounded session-history storage. 100 Scan/Stop checks: maximum Stop **11 ms**, close/idempotence passed. Compiler warnings eliminated; src contains no strcpy/sprintf. PTR CNAME/length validation, sparse 4000-port round-trip, 64 KiB profile writer bounds, source/MAC snapshot locking and configured worker cap are tested. PIE/full RELRO/NX raw ELF; stable UPX 5.2.1 --ultra-brute --lzma integrity passed.
+
+Latest evidence: dist/linux-release-validation.json; build/validation/linux-1.3.0-native.log, linux-1.3.0-gui.log, linux-1.3.0-gui-results.json, linux-monitoring-stress.log. Screenshot: docs/images/linux-1.3.0.png. The earlier GTK test driver sometimes targeted hidden leader windows when sending WM_DELETE; it now activates and closes the exact process window through the window manager. This is a test-driver correction, not proof of an application close failure.
+
+Windows regression: all 15 cases passed, with the affected profile/UI/file checks repeated after the discovered 4096-byte port-parser limit was fixed. Actual Windows screenshot is taken from published packed **1.2.0**, distinct from the new Linux version.
+
+Ubuntu 22.04 is a cross-build baseline, not a verified runtime. Physical HiDPI/NIC unplug and hours-long LAN/GUI stress are untested. The ten-minute monitoring check is a backend/controller test, not a days-long GUI test. Non-ASCII OEM NBNS names remain unknown; mDNS/active IPv6 are future scope. macOS rc.3 requires native user validation and is withheld from GitHub.
+
+The historical candidate evidence below describes preceding builds; use the hashes/results above for the stable release.
+
+---
+
 # Linux native validation — 13 October 2026
 
 Compilation and packaging took place locally on Windows. The provided VM runs Ubuntu 26.04.1 LTS x86_64. All scanner/test executables ran as an ordinary user. Root created and removed only owned veth/network-namespace fixtures; no remote compilation was used. GUI tests use isolated D-Bus/Xvfb/Openbox and separate configuration directories.

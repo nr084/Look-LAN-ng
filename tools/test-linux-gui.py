@@ -8,6 +8,7 @@ import argparse,os,sys,time,subprocess,json,pathlib,tempfile,pyatspi
 from Xlib import X,display,protocol
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--binary',type=pathlib.Path,required=True)
+parser.add_argument('--screenshot-only',action='store_true')
 parser.add_argument('--output-dir',type=pathlib.Path,default=pathlib.Path(tempfile.gettempdir()))
 args=parser.parse_args();binary=args.binary.resolve()
 root=pathlib.Path(tempfile.mkdtemp(prefix='looklan-gui-',dir=args.output_dir.resolve()))
@@ -66,12 +67,11 @@ def cells():
  return result
 def ready():return any(a.getRoleName()=='label' and a.name.startswith(('Ready |','Готово |')) for a in nodes())
 def close():
- subprocess.run(['xdotool','key','Escape'],check=True);time.sleep(.1)
- d=display.Display();wids=subprocess.check_output(['xdotool','search','--name','^Look@LAN-ng']).split()
- for wid in wids:
-  w=d.create_resource_object('window',int(wid));atom=d.intern_atom('WM_DELETE_WINDOW')
-  w.send_event(protocol.event.ClientMessage(window=w,client_type=d.intern_atom('WM_PROTOCOLS'),data=(32,[atom,X.CurrentTime,0,0,0])),event_mask=0)
- d.flush();d.close()
+ # Ask the window manager to close the exact process window, as a user does.
+ # Hidden GTK leader windows and old accessibility objects are not targets.
+ wid=subprocess.check_output(['xdotool','search','--onlyvisible','--all','--pid',str(p.pid),'--name','^Look@LAN-ng']).split()[-1].decode()
+ subprocess.run(['xdotool','windowactivate','--sync',wid,'key','alt+F4'],check=True)
+
 def start(lang='en_US.UTF-8',caption='Scan'):
  env=os.environ.copy();env['LANG']=lang;env['LC_ALL']=lang
  f=open(root/'gui.log','a');p=subprocess.Popen([str(binary)],env=env,stdout=f,stderr=f)
@@ -131,6 +131,11 @@ try:
  for path in root.glob('export.*'):path.unlink()
  (root/'saved.lanprofile').unlink(missing_ok=True)
  p=start();check(ready(),'English system locale startup')
+ if args.screenshot_only:
+  click('Scan');wait(ready,180);selected_ip(own)
+  from PIL import ImageGrab
+  ImageGrab.grab().save(root/'release-window.png');check(True,'Real default-subnet scan release screenshot');close();check(p.wait(timeout=5)==0,'Screenshot application closes cleanly');p=None;sys.exit(0)
+
  set_range(own);click('Scan');wait(ready)
  check(any(r[1]==own and r[0]=='ONLINE' and r[2] and r[3] for r in cells()),'Own IP real scan, name and MAC')
  from PIL import ImageGrab
@@ -159,6 +164,9 @@ try:
  click('Scan');wait(ready);check(len(cells())==2,'Scan uses both profile ranges')
  check(all(any(a.name==name for a in nodes()) for name in ['General','Ports','Ping','Trace','History','Log']),'Six detail tabs present');selected_ip(own);click('Ping');wait(ready);check(True,'GUI Ping completes without blocking')
  click('Trace');wait(ready);check(True,'GUI Trace completes without blocking')
+ log_tab=find('page tab','Log');rect=log_tab.queryComponent().getExtents(pyatspi.DESKTOP_COORDS);subprocess.run(['xdotool','mousemove',str(rect.x+rect.width//2),str(rect.y+rect.height//2),'click','1'],check=True);time.sleep(.2)
+ tables=[a for a in nodes() if a.getRoleName()=='table'];check(any(a.queryTable().nColumns==4 and a.queryTable().nRows>0 for a in tables),'Native Log table contains session events')
+ rect=find('page tab','General').queryComponent().getExtents(pyatspi.DESKTOP_COORDS);subprocess.run(['xdotool','mousemove',str(rect.x+rect.width//2),str(rect.y+rect.height//2),'click','1'],check=True);time.sleep(.2)
  selected_ip(own);click('Notes');fill_dialog('Notes',['GUI device note']);selected_ip(gateway);selected_ip(own)
  texts=[a.queryText().getText(0,-1) for a in nodes() if a.getRoleName()=='text' and not a.getState().contains(pyatspi.STATE_EDITABLE)]
  check(any('GUI device note' in s for s in texts),'Device notes displayed in details')

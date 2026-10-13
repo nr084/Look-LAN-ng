@@ -1,3 +1,4 @@
+#include "text.h"
 #include "posix_tools.h"
 #include "posix_names.h"
 #include <stdlib.h>
@@ -62,7 +63,7 @@ static void *worker(void *context){posix_tools_t *j=context;
     atomic_store(&j->done,true);return NULL;
 }
 posix_tools_t *posix_tools_start(const posix_interface_t *nic,uint32_t target,unsigned timeout,bool trace){posix_tools_t *j=calloc(1,sizeof(*j));if(!j)return NULL;if(!posix_backend_init(&j->backend)){free(j);return NULL;}atomic_init(&j->done,false);j->backend.selected=*nic;j->target=target;j->timeout=timeout;j->trace=trace;if(pthread_create(&j->thread,NULL,worker,j)){pthread_mutex_destroy(&j->backend.lock);free(j);return NULL;}return j;}
-posix_tools_t *posix_forward_start(const posix_interface_t *nic,const char *name){uint8_t request[512];if(!posix_address_request(name,1,request))return NULL;posix_tools_t *j=calloc(1,sizeof(*j));if(!j)return NULL;if(!posix_backend_init(&j->backend)){free(j);return NULL;}atomic_init(&j->done,false);j->backend.selected=*nic;j->forward=true;strcpy(j->name,name);if(pthread_create(&j->thread,NULL,worker,j)){pthread_mutex_destroy(&j->backend.lock);free(j);return NULL;}return j;}
+posix_tools_t *posix_forward_start(const posix_interface_t *nic,const char *name){uint8_t request[512];if(!posix_address_request(name,1,request))return NULL;posix_tools_t *j=calloc(1,sizeof(*j));if(!j)return NULL;if(!posix_backend_init(&j->backend)){free(j);return NULL;}atomic_init(&j->done,false);j->backend.selected=*nic;j->forward=true;lan_text_copy(j->name,sizeof(j->name),name);if(pthread_create(&j->thread,NULL,worker,j)){pthread_mutex_destroy(&j->backend.lock);free(j);return NULL;}return j;}
 void posix_tools_cancel(posix_tools_t *j){if(j)atomic_store(&j->backend.cancel,true);}
 bool posix_tools_pop(posix_tools_t *j,ping_sample_t *s){if(!j)return false;pthread_mutex_lock(&j->backend.lock);bool found=j->count!=0;if(found){*s=j->samples[j->head];j->head=(j->head+1)%64;--j->count;}pthread_mutex_unlock(&j->backend.lock);return found;}
 bool posix_tools_reap(posix_tools_t *j){if(!atomic_load(&j->done))return false;if(!j->joined){pthread_join(j->thread,NULL);j->joined=true;}return true;}

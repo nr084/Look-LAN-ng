@@ -1,5 +1,6 @@
 #ifndef PROFILE_H
 #define PROFILE_H
+#define PROFILE_PORT_TEXT_CAPACITY 65536
 #include "network.h"
 #include <stdint.h>
 typedef struct {

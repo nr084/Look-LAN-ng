@@ -24,6 +24,10 @@ int main(void) {
     CHECK(profile_parse(output.bytes,output.length,&loaded,error,sizeof(error))); CHECK(!strcmp(profile.name,loaded.name) && !strcmp(profile.notes,loaded.notes) && loaded.port_count == profile.port_count && loaded.concurrency == 64);
     const char good[] = "\xef\xbb\xbfLook@LAN-ngProfile=1\r\nname=Home\r\nrange=10.0.0.1-20\r\nrange=10.0.0.10-30\r\nports=80,443,80\r\nconcurrency=256\r\n";
     CHECK(profile_parse(good,sizeof(good)-1,&loaded,error,sizeof(error))); CHECK(loaded.range_count == 1 && loaded.ranges[0].last == 0x0a00001e && loaded.port_count == 2 && loaded.concurrency == 256);
+    /* Sparse lists above the old 8 KiB formatting limit must round-trip. */
+    profile_defaults(&profile);profile.ranges[0]=(ipv4_range_t){0xc0a80101,0xc0a80101};profile.range_count=1;profile.port_count=4000;
+    for(size_t i=0;i<profile.port_count;++i)profile.ports[i]=(uint16_t)(i*2+1);
+    memset(&output,0,sizeof(output));CHECK(profile_write(&profile,write_memory,&output) && output.length>8192);CHECK(profile_parse(output.bytes,output.length,&loaded,error,sizeof(error)) && loaded.port_count==4000 && loaded.ports[3999]==7999);
     const char bad[] = "Look@LAN-ngProfile=1\nrange=10.0.0.1\nconcurrency=7\n"; loaded.concurrency = 99;
     CHECK(!profile_parse(bad,sizeof(bad)-1,&loaded,error,sizeof(error)) && loaded.concurrency == 99);
     const char duplicate[] = "Look@LAN-ngProfile=1\nrange=10.0.0.1\nname=A\nname=B\n"; CHECK(!profile_parse(duplicate,sizeof(duplicate)-1,&loaded,error,sizeof(error)));

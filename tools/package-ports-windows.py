@@ -1,5 +1,5 @@
 """Package locally cross-built ports; verify contents, signatures and executable modes."""
-import argparse,hashlib,json,os,plistlib,shutil,struct,subprocess,tempfile,urllib.request,zipfile,sys
+import argparse,re,hashlib,json,os,plistlib,shutil,struct,subprocess,tempfile,urllib.request,zipfile,sys
 sys.dont_write_bytecode=True
 from pathlib import Path
 from verify_macos_port import verify_bundle as verify_code_seals
@@ -89,9 +89,11 @@ def main():
         linux_exe=work/'Look@LAN-ng';linux_packing=trial_pack(upx,linux_raw,linux_exe)
         if not linux_packing['applied']:shutil.copyfile(linux_raw,linux_exe)
         launch=work/'LookLAN.sh';launch.write_text('#!/bin/sh\nlooklan_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nexec "$looklan_dir/Look@LAN-ng" "$@"\n',encoding='utf-8',newline='\n')
-        zip_path=ROOT/'dist'/f'look@lan-ng-linux-x64-{version}.zip';write_zip(zip_path,[('Look@LAN-ng',linux_exe,0o100755),('LookLAN.sh',launch,0o100755),('LookLAN.png',ROOT/'src/resources/assets/app.png',0o100644),('README.txt',readme,0o100644)])
+        linux_version=re.search(r'^#define APP_VERSION \"([^\"]+)\"', (ROOT/'build/linux-x64/generated/desktop/build_info.h').read_text(),re.M).group(1)
+        linux_readme=ROOT/'docs/LINUX_README.txt' if '-' not in linux_version else readme
+        zip_path=ROOT/'dist'/f'look@lan-ng-linux-x64-{linux_version}.zip';write_zip(zip_path,[('Look@LAN-ng',linux_exe,0o100755),('LookLAN.sh',launch,0o100755),('LookLAN.png',ROOT/'src/resources/assets/app.png',0o100644),('README.txt',linux_readme,0o100644)])
         with zipfile.ZipFile(zip_path) as z:
             assert hashlib.sha256(z.read('Look@LAN-ng')).hexdigest()==digest(linux_exe);assert z.getinfo('Look@LAN-ng').external_attr>>16&0o111
-        summary['linux']={'file':zip_path.name,'bytes':zip_path.stat().st_size,'sha256':digest(zip_path),'upx':linux_packing,'baseline':'Ubuntu 22.04+ x64, GTK 3 system libraries','runtime_test':'not_run'}
+        summary['linux']={'version':linux_version,'file':zip_path.name,'bytes':zip_path.stat().st_size,'sha256':digest(zip_path),'upx':linux_packing,'baseline':'Ubuntu 22.04+ x64, GTK 3 system libraries','runtime_test':'not_run'}
     (ROOT/'dist/ports-package.json').write_text(json.dumps(summary,indent=2,ensure_ascii=False)+'\n',encoding='utf-8');print(json.dumps(summary,indent=2,ensure_ascii=True))
 if __name__=='__main__':main()
