@@ -51,3 +51,7 @@ The exact final screenshot-session discovery count/time is recorded in local GUI
 Intel hardware and older macOS versions were not available; Rosetta is not an Intel-machine test. macOS 13 is a deployment baseline, not a tested runtime. Fresh-ARP/cache-only controlled fixtures, physical NIC unplug/display scaling, live non-ASCII NBNS, multi-hop external Trace, all external system-client actions and hours/days monitoring were not tested on this Mac. No internet-download quarantine/Gatekeeper/notarization success is claimed. Existing VPN/network configuration was retained. Optional mDNS, active IPv6 and persistent disk device history remain outside the mandatory scope.
 
 Evidence: build/validation/macos-native/; raw binary: build/unpacked/1.3.1/macos-native-universal/. Temporary export/profile/packaging files are removed after verification; settings and user profiles are retained. Diagnostics ZIP retains raw builds and automated logs. No credentials are stored in source or release artifacts.
+
+## Publication verification
+
+Published as latest stable: https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.1 . DMG and diagnostics ZIP downloaded back from GitHub; SHA-256 matches the local native-validated artifacts. Both screenshot PNGs match the bytes in the release tag. Source commit: e573a1d8abcdca076f9e793284b5d629ecfa6ef0. The superseded empty draft created during publisher setup was removed; existing Windows/Linux release history retained.
