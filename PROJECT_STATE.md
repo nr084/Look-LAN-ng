@@ -1,3 +1,17 @@
+# Implementation complete candidates — 1.3.1-rc.1, 13 October 2026
+
+The user explicitly requested completing the mandatory specification for all agreed architectures without further checks or waiting for Mac access. Windows x86/x64/ARM64, Linux x64 and macOS universal x86_64/arm64 have implementation-complete local candidates. All compilation took place on Windows. This stage ran no CTest, VM/GUI/native smoke, UPX integrity, signature or DMG extraction checks. Definition of Done validation is not claimed complete.
+
+The final implementation pass adds per-device session history, consistent diagnostics and error text, no fabricated RTT for failures/unknown TTL, correct Ping/Trace selection and row activation. Native macOS splitters resize/persist the network and details panes. Scan/Export menu commands and keyboard actions are available. GTK closes modal work safely. Both Unix status bars expose online/offline, progress and elapsed time.
+
+Local compiler targets: Windows x86/x64 MSVC v143; Windows ARM64 LLVM-MinGW fallback because the installed MSVC has no ARM64 components (static support libraries, system UCRT, native Win32 and source-bound asynchronous Windows DNS unchanged). Linux uses the Ubuntu 22.04 GTK3 sysroot; Mac deploys to 13.0+ and combines both architectures.
+
+All five candidate packages are in dist with version 1.3.1-rc.1. Windows has one EXE per architecture ZIP, Linux a ZIP, Mac a universal DMG. Latest official stable UPX 5.2.1 was used with --ultra-brute --lzma for Windows/Linux. Packed integrity and startup are deliberately not checked. UPX refuses Mach-O; it is preserved and the DMG is LZMA compressed. Raw builds remain under build/unpacked. dist/development-artifacts.json records exact artifacts and checks=not_run. Publisher rejects these unvalidated development artifacts. Source code may be pushed; these candidates are not published as ready releases.
+
+Public validated releases remain Windows 1.2.0 and Linux 1.3.0. Their existing artifacts/evidence are preserved. macOS native validation and final screenshot still await later access. Optional future mDNS, active IPv6 and persistent disk history are outside the mandatory v1.00 scope. Prior evidence below is historical and does not validate 1.3.1-rc.1.
+
+---
+
 # Current release work — 13 October 2026
 
 Published release: https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.0 (one Linux x64 ZIP; public Windows 1.2.0 history retained). Download-back ZIP SHA-256 matched the native-tested artifact. Completed VM test files were removed after fetching all evidence.

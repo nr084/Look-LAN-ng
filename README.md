@@ -6,6 +6,17 @@
 
 [Релизы / Releases](https://github.com/nr084/Look-LAN-ng/releases) · [ТЗ / Specification](docs/SPECIFICATION.md) · [Статус / Status](docs/SPEC_STATUS.md) · [Build](BUILD.md)
 
+**Локальная разработка / Local development:** обязательная функциональность
+ТЗ реализована для Windows x86/x64/ARM64, Linux x64 и macOS universal.
+Кандидат **1.3.1-rc.1** собран локально для всех этих целей; по указанию
+пользователя проверки в этом этапе не выполнялись. Это не новый проверенный
+stable release; опубликованные Windows 1.2.0 и Linux 1.3.0 сохранены.
+
+Required specification features are implemented for all those targets. Local
+**1.3.1-rc.1** candidates were compiled without validation at the user's request;
+they are not published as verified stable releases. See [implementation status](docs/SPEC_STATUS.md)
+and [candidate notes](docs/DEVELOPMENT_README.txt).
+
 ## Русский
 
 ### Скачать и запустить

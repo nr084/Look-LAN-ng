@@ -217,10 +217,10 @@ static void seed_cache(win_backend_t *b) {
 static DWORD WINAPI coordinate(void *parameter) {
     win_backend_t *b = parameter;
     if (b->monitoring) {
-        MIB_IF_ROW2 interface = {0}; interface.InterfaceIndex = b->selected.index;
+        MIB_IF_ROW2 interface_row = {0}; interface_row.InterfaceIndex = b->selected.index;
         MIB_UNICASTIPADDRESS_ROW address = {0}; address.InterfaceIndex = b->selected.index;
         address.Address.Ipv4.sin_family = AF_INET; address.Address.Ipv4.sin_addr.s_addr = htonl(b->selected.ip);
-        if (GetIfEntry2(&interface) != NO_ERROR || interface.OperStatus != IfOperStatusUp || GetUnicastIpAddressEntry(&address) != NO_ERROR) {
+        if (GetIfEntry2(&interface_row) != NO_ERROR || interface_row.OperStatus != IfOperStatusUp || GetUnicastIpAddressEntry(&address) != NO_ERROR) {
             net_event_t e = {0}; e.generation = b->generation; e.type = NET_ERROR; e.error = ERROR_NETWORK_UNREACHABLE; emit(b,&e); e.type = NET_DONE; emit(b,&e); return 0;
         }
     }

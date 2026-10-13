@@ -13,6 +13,7 @@ typedef struct {
     lan_host_t *hosts;size_t host_count;monitor_event_t *log;monitor_t monitor;profile_t profile;
     vendor_table_t vendors;details_store_t *details;bool russian,scanning,monitoring,closing,closed,failed;unsigned language;uint32_t completed,total;
     uint64_t next_round;
+    uint64_t scan_started_ms,scan_elapsed_ms,status_updated_ms;
     posix_tools_t *tools;bool tracing;ping_sample_t trace[30];size_t trace_count;uint32_t trace_ip,trace_interface;
     desktop_io_t *io;profile_t *pending_profile;bool profile_changed;
     bool resolving,resolve_cancelled;uint32_t resolved_ip;
@@ -40,6 +41,7 @@ void desktop_detail(const desktop_app_t *app,size_t index,char *out,size_t capac
 void desktop_detail_part(const desktop_app_t *app,size_t index,unsigned part,char *out,size_t capacity);
 int desktop_compare(const desktop_app_t *app,size_t first,size_t second,unsigned column);
 void desktop_network_text(const desktop_app_t *app,char *out,size_t capacity);
+void desktop_status_text(const desktop_app_t *app,char *out,size_t capacity);
 bool desktop_reload_profiles(desktop_app_t *app);
 bool desktop_poll(desktop_app_t *app);
 bool desktop_close(desktop_app_t *app);

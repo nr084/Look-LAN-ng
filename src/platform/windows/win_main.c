@@ -329,7 +329,7 @@ static void show_detail(void) {
             }
         }
         if (app.tools_job && app.tools_trace && app.trace_target == ipv4_value(&h->address) && app.trace_interface == h->interface_index) wcscat_s(text,4096,tr(L"Tracing… Stop cancels.",L"Трассировка… Стоп отменяет."));
-        else if (!app.trace_count || app.trace_target != ipv4_value(&h->address)) wcscat_s(text,4096,tr(L"Use Traceroute from the context menu.",L"Выберите Трассировку в контекстном меню."));
+        else if (!app.trace_count || app.trace_target != ipv4_value(&h->address) || app.trace_interface != h->interface_index) wcscat_s(text,4096,tr(L"Use Traceroute from the context menu.",L"Выберите Трассировку в контекстном меню."));
     } else if (TabCtrl_GetCurSel(app.tabs) == 1) {
         swprintf_s(text,4096,L"%ls: %ls\r\n%ls\r\n",tr(L"Host",L"Узел"),ip,tr(L"Detected open TCP ports (service names are port-based hints):",L"Обнаруженные открытые TCP-порты (названия сервисов — подсказки по номеру порта):"));
         for (unsigned i = 0; i < h->port_count; ++i) {

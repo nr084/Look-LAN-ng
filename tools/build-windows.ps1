@@ -11,7 +11,11 @@ $generator=switch($major) { 17 {'Visual Studio 17 2022'} 18 {'Visual Studio 18 2
 Write-Host "Using $generator at $($instances[0].installationPath) for $Architecture"
 cmake -S $projectRoot -B $buildRoot -G $generator -A $platform "-DCMAKE_GENERATOR_INSTANCE=$($instances[0].installationPath)"
 if ($LASTEXITCODE) { throw 'CMake configure failed' }
-cmake --build $buildRoot --config Release --parallel
+if ($BuildOnly) {
+    cmake --build $buildRoot --config Release --target LookAtLANng --parallel 8
+} else {
+    cmake --build $buildRoot --config Release --parallel
+}
 if ($LASTEXITCODE) { throw 'Release build failed' }
 if (!$BuildOnly) {
     ctest --test-dir $buildRoot -C Release --output-on-failure

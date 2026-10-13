@@ -1,4 +1,19 @@
-# Выполнение ТЗ — 1.2.0
+# Реализация ТЗ — 1.3.1-rc.1
+
+13 октября 2026: по прямому указанию пользователя текущий этап выполнен без
+дополнительных проверок. Обязательная функциональность реализована в коде для
+Windows x86/x64/ARM64, Linux x64 и macOS universal x86_64/arm64; все пять
+поставок собраны локально на Windows. Это **готовность реализации**, не
+прохождение Definition of Done с native/DPI/LAN/resource проверками. Текущий
+кандидат не опубликован как проверенный stable.
+
+Закрыты Unix-недоработки: история последних событий выбранного узла ищется
+по всей session ring; Ping/Trace выводят ошибки без выдуманной задержки 0 ms;
+нижняя панель и переходы по действиям/двойному щелчку согласованы. macOS имеет
+изменяемые native split panels и Scan/Export menus. Оба Unix UI показывают
+online/offline, прогресс и elapsed time; GTK modal return paths защищены от
+работы после закрытия. Windows ARM64 имеет локальный LLVM-MinGW fallback при
+отсутствующих MSVC ARM64 tools, сохраняя async DNS и native Win32.
 
 Пункты относятся к `SPECIFICATION.md` с пользовательскими уточнениями имени, RU/EN, copyright, GUARD_CF и UPX. Functional implementation и проверки разделены. Разрешение пользователя выпустить stable с оговорками не выдаётся за прохождение всей validation matrix.
 
@@ -13,7 +28,7 @@
 | 19–24: Single Host/monitoring/NEW/log/statistics/tree | Реализовано; bounded memory, history current session |
 | 25–27: UTF-8 profiles/CSV/TXT/HTML/portable settings | Реализовано; autonomous HTML, transactional save/export |
 | 28–32: size/build/system APIs/concurrency | Реализовано; static CRT, x86/x64/ARM64, only system DLL, 8–256, cancellation/rate cap; GUARD_CF удалён по уточнению пользователя |
-| 33–35: portable boundaries/future platforms | Core без Windows headers; Windows x86/x64/ARM64 опубликованы; Linux/macOS остаются будущими |
+| 33–35: portable boundaries/platforms | Core без Windows headers; Windows x86/x64/ARM64, Linux x64, macOS universal реализованы и собираются локально; native-проверки нового кандидата не выполнялись |
 | 36: IPv6 | Address model поддерживает family/scope; active IPv4. Optional neighbor display не реализован; массовый IPv6 scan запрещён ТЗ |
 | 37–39: model/ownership/errors | Bounded arrays/rings/queues, explicit lifetime и error handling; автоматические tests |
 | 40–43: Cancel/responsiveness/rate/privileges | Scan и diagnostics cancellation; UI не ждёт workers. Native IO завершает safe cleanup позже; жёсткий OS shutdown deadline не гарантируется |

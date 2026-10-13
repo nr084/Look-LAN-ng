@@ -3,6 +3,15 @@ $ErrorActionPreference='Stop'
 if($Version -notmatch '^\d+\.\d+\.\d+([-.][A-Za-z0-9.]+)?$'){throw 'Invalid release version'}
 $repository='nr084/Look-LAN-ng';$tag='v'+$Version
 $files=@($Assets | ForEach-Object {Get-Item -LiteralPath $_});if(!$files.Count){throw 'No release assets'}
+$developmentPath=Join-Path $PSScriptRoot '../dist/development-artifacts.json'
+if(Test-Path -LiteralPath $developmentPath){
+    $development=Get-Content -LiteralPath $developmentPath -Raw -Encoding utf8 | ConvertFrom-Json
+    foreach($file in $files){
+        if($development.assets.($file.Name) -eq (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant()){
+            throw 'Local development artifact was built without validation; it must not be published as a ready release.'
+        }
+    }
+}
 foreach($platform in @('linux','macos')){
     $portFiles=@($files | Where-Object { $_.Name -like ('look@lan-ng-'+$platform+'-*') })
     if(!$portFiles.Count){continue}

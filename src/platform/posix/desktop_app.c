@@ -14,6 +14,7 @@
 extern const unsigned char desktop_oui[];
 extern const size_t desktop_oui_size;
 static uint64_t monotonic_seconds(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec;}
+static uint64_t monotonic_ms(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000+(uint64_t)t.tv_nsec/1000000;}
 const char *desktop_tr(const desktop_app_t *a,const char *en,const char *ru){return a->russian ? ru : en;}
 static bool ru_system(const char *language){return language && language[0]=='r' && language[1]=='u' && (language[2]=='_' || language[2]=='-' || language[2]==0);}
 void desktop_language(desktop_app_t *a,unsigned language,const char *system){
@@ -42,6 +43,7 @@ bool desktop_init(desktop_app_t *a,const char *system){
 bool desktop_refresh(desktop_app_t *a){if(a->scanning || a->monitoring || a->tools || a->io)return false;a->interface_count=posix_interfaces(a->interfaces,POSIX_INTERFACES);a->selected=SIZE_MAX;a->host_count=0;size_t best=SIZE_MAX;for(size_t i=0;i<a->interface_count;++i){const posix_interface_t *nic=&a->interfaces[i];if(!nic->automatic)continue;if(best==SIZE_MAX || (nic->gateway && !a->interfaces[best].gateway) || (nic->gateway && nic->has_metric && a->interfaces[best].has_metric && nic->metric<a->interfaces[best].metric))best=i;}return best!=SIZE_MAX ? desktop_select(a,best):true;}
 bool desktop_select(desktop_app_t *a,size_t index){
     if(a->scanning || a->monitoring || a->tools || a->io || index>=a->interface_count)return false;a->selected=index;monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);
+    a->completed=a->total=0;a->scan_started_ms=a->scan_elapsed_ms=0;
     posix_invalidate_names(&a->backend);memset(a->arp_only,0,sizeof(a->arp_only));
     posix_interface_t *nic=&a->interfaces[index];profile_defaults(&a->profile);
     snprintf(a->profile.interface_id,sizeof(a->profile.interface_id),"%s",nic->name);network_range(nic->ip,nic->prefix,&a->profile.ranges[0]);a->profile.range_count=1;return true;
@@ -54,7 +56,7 @@ bool desktop_start(desktop_app_t *a,const char *range){
     memset(a->round_proof,0,sizeof(a->round_proof));memset(a->cached_round,0,sizeof(a->cached_round));
     a->backend.pace_ms=a->monitoring ? 16:4;a->backend.monitoring=a->monitoring;
     if(!posix_scan_start(&a->backend,&a->interfaces[a->selected],&a->profile)){snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"Cannot start scan","Не удалось начать сканирование"));return false;}
-    monitor_begin_ranges(&a->monitor,a->profile.ranges,a->profile.range_count,a->interfaces[a->selected].index,true,(uint64_t)time(NULL));a->scanning=true;return true;
+    monitor_begin_ranges(&a->monitor,a->profile.ranges,a->profile.range_count,a->interfaces[a->selected].index,true,(uint64_t)time(NULL));a->scan_started_ms=monotonic_ms();a->scan_elapsed_ms=0;a->status_updated_ms=a->scan_started_ms;a->scanning=true;return true;
 }
 uint64_t desktop_scope_size(const desktop_app_t *a,const char *range){if(range && *range){ipv4_range_t value;return range_parse(range,strlen(range),&value) ? (uint64_t)value.last-value.first+1:0;}uint64_t total=0;for(size_t i=0;i<a->profile.range_count;++i)total+=(uint64_t)a->profile.ranges[i].last-a->profile.ranges[i].first+1;return total;}
 bool desktop_single(desktop_app_t *a,uint32_t ip){ipv4_range_t ranges[NETWORK_MAX_RANGES];size_t count=a->profile.range_count;memcpy(ranges,a->profile.ranges,count*sizeof(*ranges));char target[32];ipv4_format(ip,target,sizeof(target));bool started=desktop_start(a,target);memcpy(a->profile.ranges,ranges,count*sizeof(*ranges));a->profile.range_count=count;if(started){lan_host_t candidate={0};candidate.address=ipv4_address(ip);candidate.interface_index=a->interfaces[a->selected].index;candidate.cache_only=true;monitor_observe(&a->monitor,&candidate,false,(uint64_t)time(NULL));}return started;}
@@ -81,8 +83,9 @@ bool desktop_poll(desktop_app_t *a){
         else if(event.type==PX_ERROR){a->failed=true;snprintf(a->error,sizeof(a->error),"%s: %d",desktop_tr(a,"Network error","Ошибка сети"),event.error);monitor_note(&a->monitor,MON_SCAN_ERROR,a->error,(uint64_t)time(NULL));}
     }
     pthread_mutex_lock(&a->backend.lock);bool empty=a->backend.count==0;pthread_mutex_unlock(&a->backend.lock);
-    if(a->scanning && empty && posix_reap(&a->backend)){bool complete=!a->failed && !atomic_load(&a->backend.cancel);if(complete)for(size_t i=0;i<a->host_count;++i){lan_host_t *h=&a->hosts[i];if(a->round_proof[i])a->arp_only[i]=a->round_proof[i]==PX_PROOF_ARP;else if(a->arp_only[i] && h->first_seen && h->seen_round!=a->monitor.round){h->cache_only=a->cached_round[i];a->row_dirty[i]=true;if(h->cache_only){h->online=false;h->has_latency=false;}else if(h->missed_rounds+1>=a->monitor.offline_threshold)h->online=true;}}monitor_finish(&a->monitor,complete,(uint64_t)time(NULL));if(complete)for(size_t i=0;i<a->host_count;++i)if(!a->hosts[i].online)a->row_dirty[i]=true;a->scanning=false;if(a->failed)a->monitoring=false;a->next_round=monotonic_seconds()+a->profile.monitor_interval_sec;changed=true;}
+    if(a->scanning && empty && posix_reap(&a->backend)){bool complete=!a->failed && !atomic_load(&a->backend.cancel);if(complete)for(size_t i=0;i<a->host_count;++i){lan_host_t *h=&a->hosts[i];if(a->round_proof[i])a->arp_only[i]=a->round_proof[i]==PX_PROOF_ARP;else if(a->arp_only[i] && h->first_seen && h->seen_round!=a->monitor.round){h->cache_only=a->cached_round[i];a->row_dirty[i]=true;if(h->cache_only){h->online=false;h->has_latency=false;}else if(h->missed_rounds+1>=a->monitor.offline_threshold)h->online=true;}}monitor_finish(&a->monitor,complete,(uint64_t)time(NULL));if(complete)for(size_t i=0;i<a->host_count;++i)if(!a->hosts[i].online)a->row_dirty[i]=true;a->scan_elapsed_ms=monotonic_ms()-a->scan_started_ms;a->scanning=false;if(a->failed)a->monitoring=false;a->next_round=monotonic_seconds()+a->profile.monitor_interval_sec;changed=true;}
     if(a->monitoring && !a->scanning && !a->tools && !a->io && monotonic_seconds()>=a->next_round){if(!desktop_start(a,NULL))a->monitoring=false;changed=true;}
+    if(a->scanning && monotonic_ms()-a->status_updated_ms>=150){a->status_updated_ms=monotonic_ms();changed=true;}
     bool names_pending=posix_names_pending(&a->backend);if(names_pending!=a->names_pending){a->names_pending=names_pending;changed=true;}return changed;
 }
 bool desktop_close(desktop_app_t *a){if(a->closed)return true;a->closing=true;desktop_stop(a);if(a->io){if(!desktop_io_finished(a->io))return false;desktop_io_result(a->io,NULL,NULL);desktop_io_free(a->io);a->io=NULL;}if(a->tools){if(!posix_tools_reap(a->tools))return false;posix_tools_free(a->tools);a->tools=NULL;}if(!posix_backend_destroy(&a->backend))return false;free(a->pending_profile);a->pending_profile=NULL;free(a->hosts);free(a->log);free(a->details);a->hosts=NULL;a->log=NULL;a->details=NULL;a->host_count=0;a->closed=true;return true;}
@@ -108,22 +111,66 @@ bool desktop_profile_rebind(desktop_app_t *a,size_t index){if(!a->pending_profil
 bool desktop_profile_open(desktop_app_t *a,const char *path){if(a->io || a->scanning || a->monitoring || a->tools)return false;a->io=desktop_io_start(DESKTOP_OPEN_PROFILE,path,&a->profile,NULL,0,&a->vendors,REPORT_CSV,a->russian,NULL);return a->io!=NULL;}
 void desktop_stop(desktop_app_t *a){a->monitoring=false;if(a->resolving)a->resolve_cancelled=true;posix_stop(&a->backend);posix_tools_cancel(a->tools);desktop_io_cancel(a->io);}
 bool desktop_diagnostic(desktop_app_t *a,uint32_t ip,bool trace){if(a->scanning || a->tools || a->io || a->closing || a->selected>=a->interface_count)return false;a->tools=posix_tools_start(&a->interfaces[a->selected],ip,a->profile.icmp_timeout_ms,trace);if(!a->tools)return false;a->tracing=trace;if(trace){a->trace_count=0;a->trace_ip=ip;a->trace_interface=a->interfaces[a->selected].index;}return true;}
+static const char *diagnostic_status(const desktop_app_t *a,uint32_t status){
+    switch(status){
+    case SCAN_OK:return "OK";
+    case SCAN_TIMEOUT:return desktop_tr(a,"Timed out","Нет ответа");
+    case SCAN_UNREACHABLE:return desktop_tr(a,"Unreachable","Недоступен");
+    case SCAN_REFUSED:return desktop_tr(a,"Refused","Соединение отклонено");
+    case SCAN_NO_ROUTE:return desktop_tr(a,"No route","Нет маршрута");
+    case SCAN_CANCELLED:return desktop_tr(a,"Cancelled","Отменено");
+    default:return desktop_tr(a,"System error","Системная ошибка");
+    }
+}
+static size_t recent_ping(const desktop_app_t *a,uint32_t ip,uint32_t scope,size_t indices[60]){
+    size_t count=0;for(size_t i=a->details->ping_count;i && count<60;--i){
+        const ping_sample_t *sample=details_ping_at(a->details,i-1);
+        if(sample->ip==ip && sample->interface_index==scope)indices[count++]=i-1;
+    }return count;
+}
 void desktop_detail(const desktop_app_t *a,size_t index,char *out,size_t capacity){
     if(!capacity)return;out[0]=0;if(index>=a->host_count)return;const lan_host_t *h=&a->hosts[index];uint32_t ip=ipv4_value(&h->address);size_t used=0;const char *en[]={"Status","IP Address","Host Name","MAC Address","Vendor","Device / OS","Latency","Services","First Seen","Last Seen"},*ru[]={"Статус","IP-адрес","Имя узла","MAC-адрес","Производитель","Устройство / ОС","Задержка","Сервисы","Первый ответ","Последний ответ"};
     for(unsigned c=0;c<10;++c){char value[512];desktop_cell(a,index,c,value,sizeof(value));int n=snprintf(out+used,capacity-used,"%s: %s\n",a->russian ? ru[c]:en[c],value);if(n<0 || (size_t)n>=capacity-used)return;used+=n;}
     int n=snprintf(out+used,capacity-used,"\n%s: %s\n\nPing\n",desktop_tr(a,"Notes","Заметки"),details_note(a->details,ip,h->interface_index));if(n<0 || (size_t)n>=capacity-used)return;used+=n;
-    size_t start=a->details->ping_count>60 ? a->details->ping_count-60:0;for(size_t i=start;i<a->details->ping_count;++i){const ping_sample_t *s=details_ping_at(a->details,i);if(s->ip!=ip || s->interface_index!=h->interface_index)continue;n=snprintf(out+used,capacity-used,"%llu  %s  %u ms\n",(unsigned long long)s->timestamp,s->received ? "OK":"*",s->latency_ms);if(n<0 || (size_t)n>=capacity-used)return;used+=n;}
-    if(a->trace_ip==ip && a->trace_interface==h->interface_index){n=snprintf(out+used,capacity-used,"\nTrace\n");if(n<0 || (size_t)n>=capacity-used)return;used+=n;for(size_t i=0;i<a->trace_count;++i){const ping_sample_t *s=&a->trace[i];char reply[32];ipv4_format(s->reply_ip,reply,sizeof(reply));n=snprintf(out+used,capacity-used,"%u  %s  %u ms\n",s->hop,s->received ? reply:"*",s->latency_ms);if(n<0 || (size_t)n>=capacity-used)return;used+=n;}}
+    char value[8192];desktop_detail_part(a,index,2,value,sizeof(value));
+    n=snprintf(out+used,capacity-used,"%s",value);if(n<0 || (size_t)n>=capacity-used)return;used+=n;
+    if(a->trace_ip==ip && a->trace_interface==h->interface_index){desktop_detail_part(a,index,3,value,sizeof(value));snprintf(out+used,capacity-used,"\nTrace\n%s",value);}
+
 }
 void desktop_network_text(const desktop_app_t *a,char *out,size_t capacity){if(a->selected>=a->interface_count){snprintf(out,capacity,"%s",desktop_tr(a,"Select a network interface","Выберите сетевой интерфейс"));return;}const posix_interface_t *nic=&a->interfaces[a->selected];char ip[32],gateway[32],dns[128]="",metric[32];ipv4_format(nic->ip,ip,sizeof(ip));if(nic->gateway)ipv4_format(nic->gateway,gateway,sizeof(gateway));else snprintf(gateway,sizeof(gateway),"—");if(nic->has_metric)snprintf(metric,sizeof(metric),"%u",nic->metric);else snprintf(metric,sizeof(metric),"—");for(size_t i=0;i<nic->dns_count;++i){char value[32];ipv4_format(nic->dns[i],value,sizeof(value));size_t n=strlen(dns);snprintf(dns+n,sizeof(dns)-n,"%s%s",i ? ", ":"",value);}snprintf(out,capacity,"%s | %s/%u | %s: %s | DNS: %s | %s: %s | %s: %s",nic->name,ip,nic->prefix,desktop_tr(a,"Gateway","Шлюз"),gateway,dns[0] ? dns:"—",desktop_tr(a,"Metric","Метрика"),metric,desktop_tr(a,"Profile","Профиль"),a->profile.name);}
+void desktop_status_text(const desktop_app_t *a,char *out,size_t capacity){
+    statistics_t stats=statistics_compute(a->hosts,a->host_count,a->completed);
+    const char *state=desktop_tr(a,a->scanning ? "Scanning":a->tools ? "Diagnostics":a->io ? "File operation":a->monitoring ? "Monitoring":a->names_pending ? "Names":"Ready",a->scanning ? "Сканирование":a->tools ? "Диагностика":a->io ? "Работа с файлом":a->monitoring ? "Мониторинг":a->names_pending ? "Имена":"Готово");
+    uint64_t elapsed=a->scanning && a->scan_started_ms ? monotonic_ms()-a->scan_started_ms:a->scan_elapsed_ms;
+    snprintf(out,capacity,"%s | %s: %zu | %s: %zu | %s: %u / %u | %llu.%03llu %s",state,desktop_tr(a,"Online","В сети"),stats.online,desktop_tr(a,"Offline","Не в сети"),stats.offline,desktop_tr(a,"Scanned","Проверено"),a->completed,a->total,(unsigned long long)(elapsed/1000),(unsigned long long)(elapsed%1000),desktop_tr(a,"s","с"));
+}
 static bool append_detail(char *out,size_t capacity,size_t *used,const char *format,...){if(*used>=capacity)return false;va_list args;va_start(args,format);int n=vsnprintf(out+*used,capacity-*used,format,args);va_end(args);if(n<0 || (size_t)n>=capacity-*used){out[*used]=0;return false;}*used+=(size_t)n;return true;}
 void desktop_detail_part(const desktop_app_t *a,size_t index,unsigned part,char *out,size_t capacity){
     if(!capacity)return;out[0]=0;if(part==5){desktop_history(a,out,capacity);return;}if(index>=a->host_count)return;const lan_host_t *h=&a->hosts[index];uint32_t ip=ipv4_value(&h->address);size_t used=0;
-    if(part==0){desktop_detail(a,index,out,capacity);char *end=strstr(out,"\n\nPing\n");if(end)*end=0;used=strlen(out);const char *name="—";for(size_t i=0;i<a->interface_count;++i)if(a->interfaces[i].index==h->interface_index)name=a->interfaces[i].name;append_detail(out,capacity,&used,"\n%s: %s\nTTL: %u\n",desktop_tr(a,"Interface","Интерфейс"),name,h->ttl);return;}
-    if(part==1){for(unsigned i=0;i<h->port_count;++i)if(!append_detail(out,capacity,&used,"%u  %s\n",h->open_ports[i],port_service(h->open_ports[i])))break;if(h->ports_truncated)append_detail(out,capacity,&used,"\n%s\n",desktop_tr(a,"Only the first 64 open ports are shown","Показаны первые 64 открытых порта"));if(!h->ports_checked)append_detail(out,capacity,&used,"%s",desktop_tr(a,"Ports not checked","Порты не проверены"));return;}
-    if(part==2){size_t samples[60],count=0;for(size_t i=a->details->ping_count;i && count<60;--i){const ping_sample_t *s=details_ping_at(a->details,i-1);if(s->ip==ip && s->interface_index==h->interface_index)samples[count++]=i-1;}for(size_t i=count;i;--i){const ping_sample_t *s=details_ping_at(a->details,samples[i-1]);char date[32];timestamp(s->timestamp,date,sizeof(date));if(!append_detail(out,capacity,&used,"%s  %s  %u ms\n",date,s->received ? "OK":"*",s->latency_ms))break;}return;}
-    if(part==3){if(a->trace_ip!=ip || a->trace_interface!=h->interface_index)return;for(size_t i=0;i<a->trace_count;++i){const ping_sample_t *s=&a->trace[i];char reply[32];ipv4_format(s->reply_ip,reply,sizeof(reply));if(!append_detail(out,capacity,&used,"%u  %s  %u ms\n",s->hop,s->received ? reply:"*",s->latency_ms))break;}return;}
-    if(part==4){const char *en[]={"Scan started","Scan finished","Scan cancelled","ONLINE","OFFLINE","NEW","IP changed","MAC changed","Name changed","Scan error","Export started","Export finished","Export error"},*ru[]={"Начало сканирования","Сканирование завершено","Сканирование отменено","В СЕТИ","НЕ В СЕТИ","НОВЫЙ","Изменён IP","Изменён MAC","Изменено имя","Ошибка сканирования","Начало экспорта","Экспорт завершён","Ошибка экспорта"};size_t start=a->monitor.log_count>200 ? a->monitor.log_count-200:0;for(size_t i=start;i<a->monitor.log_count;++i){const monitor_event_t *e=monitor_log_at(&a->monitor,i);if(e->address.family!=4 || ipv4_value(&e->address)!=ip)continue;char date[32];timestamp(e->timestamp,date,sizeof(date));if(!append_detail(out,capacity,&used,"%s  %s  %s%s%s\n",date,(unsigned)e->type<13 ? (a->russian ? ru[e->type]:en[e->type]):"?",e->previous,e->previous[0] ? " → ":"",e->current))break;}}
+    if(part==0){desktop_detail(a,index,out,capacity);char *end=strstr(out,"\n\nPing\n");if(end)*end=0;used=strlen(out);const char *name="—";for(size_t i=0;i<a->interface_count;++i)if(a->interfaces[i].index==h->interface_index)name=a->interfaces[i].name;char ttl[16];if(h->ttl)snprintf(ttl,sizeof(ttl),"%u",h->ttl);else snprintf(ttl,sizeof(ttl),"—");append_detail(out,capacity,&used,"\n%s: %s\nTTL: %s\n",desktop_tr(a,"Interface","Интерфейс"),name,ttl);return;}
+    if(part==1){for(unsigned i=0;i<h->port_count;++i)if(!append_detail(out,capacity,&used,"%u  %s\n",h->open_ports[i],port_service(h->open_ports[i])))break;if(h->ports_truncated)append_detail(out,capacity,&used,"\n%s\n",desktop_tr(a,"Only the first 64 open ports are shown","Показаны первые 64 открытых порта"));if(h->ports_checked && !h->port_count)append_detail(out,capacity,&used,"%s",desktop_tr(a,"No open ports found","Открытые порты не найдены"));if(!h->ports_checked)append_detail(out,capacity,&used,"%s",desktop_tr(a,"Ports not checked","Порты не проверены"));return;}
+    if(part==2){
+        size_t samples[60],count=recent_ping(a,ip,h->interface_index,samples);
+        for(size_t i=count;i;--i){const ping_sample_t *sample=details_ping_at(a->details,samples[i-1]);char date[32];timestamp(sample->timestamp,date,sizeof(date));
+            bool ok=sample->received ? append_detail(out,capacity,&used,"%s  OK  %u ms\n",date,sample->latency_ms):append_detail(out,capacity,&used,"%s  %s\n",date,diagnostic_status(a,sample->status));if(!ok)break;
+        }if(!count)append_detail(out,capacity,&used,"%s",desktop_tr(a,"Use Ping to request replies","Нажмите Ping для проверки ответов"));return;
+    }
+    if(part==3){
+        if(a->trace_ip!=ip || a->trace_interface!=h->interface_index || !a->trace_count){append_detail(out,capacity,&used,"%s",desktop_tr(a,"Use Traceroute to request the route","Нажмите Traceroute для проверки маршрута"));return;}
+        for(size_t i=0;i<a->trace_count;++i){const ping_sample_t *sample=&a->trace[i];bool ok;
+            if(sample->received){char reply[32];ipv4_format(sample->reply_ip,reply,sizeof(reply));ok=append_detail(out,capacity,&used,"%u  %s  %u ms\n",sample->hop,reply,sample->latency_ms);}
+            else if(sample->hop)ok=append_detail(out,capacity,&used,"%u  *  %s\n",sample->hop,diagnostic_status(a,sample->status));
+            else ok=append_detail(out,capacity,&used,"%s\n",diagnostic_status(a,sample->status));
+            if(!ok)break;
+        }return;
+    }
+    if(part==4){
+        size_t events[200],count=0;
+        for(size_t i=a->monitor.log_count;i && count<200;--i){const monitor_event_t *event=monitor_log_at(&a->monitor,i-1);if(event->address.family==4 && ipv4_value(&event->address)==ip)events[count++]=i-1;}
+        for(size_t i=count;i;--i){char date[64],event[128],value[600];size_t row=events[i-1];desktop_log_cell(a,row,0,date,sizeof(date));desktop_log_cell(a,row,1,event,sizeof(event));desktop_log_cell(a,row,3,value,sizeof(value));if(!append_detail(out,capacity,&used,"%s  %s  %s\n",date,event,value))break;}
+        if(!count)append_detail(out,capacity,&used,"%s",desktop_tr(a,"No changes in this session","В этой сессии изменений нет"));
+    }
+
 }
 int desktop_compare(const desktop_app_t *a,size_t first,size_t second,unsigned col){
     if(first>=a->host_count || second>=a->host_count)return 0;const lan_host_t *x=&a->hosts[first],*y=&a->hosts[second];uint64_t u=0,v=0;bool numeric=true;

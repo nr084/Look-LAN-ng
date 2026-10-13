@@ -124,3 +124,21 @@ CMake native Unix builds also support Cocoa or pkg-config GTK3. Core C17 is unch
 Publication: `tools/publish-local-release.ps1 -Version <version> -NotesFile <notes> -Assets <files> -Prerelease` uploads already built local files to a draft, verifies GitHub SHA-256/size and publishes only after upload verification. It does not compile or replace published assets. Port previews are prohibited. Linux and macOS each require dist/<platform>-release-validation.json with the exact stable version, native_tests=passed, feature_complete=true and matching SHA-256 for every asset. Candidate builds remain local until the native checks are complete.
 
 Private macOS candidates include Native-tests.command plus a universal diagnostic test executable. Run from a writable copy; its temporary configuration is removed and Native-tests.log is retained for review. Final stable DMGs omit this candidate-only test executable.
+
+## Implementation-only stage: all local architecture candidates
+
+At the user's explicit request, 1.3.1-rc.1 is built and packaged without running tests or validation. No application is launched by these commands:
+
+```powershell
+./tools/build-windows.ps1 -Architecture x86 -BuildOnly
+./tools/build-windows.ps1 -Architecture x64 -BuildOnly
+python tools/build-windows-arm64.py
+python tools/build-ports-windows.py
+python tools/package-development.py
+```
+
+The ARM64 fallback uses the existing sibling LLVM-MinGW toolchain read-only and writes build/windows-arm64-llvm; the EXE is copied to build/windows-arm64/Release for the common packaging layout. Its compatibility declarations only fill omissions of that SDK, and preserve Windows async resolution/cancellation. MSVC remains primary for x86/x64. No compiler/runtime is required on users' machines beyond OS-provided APIs/UCRT.
+
+package-development.py is restricted to RC versions, creates three one-EXE Windows ZIPs plus the Linux ZIP/universal DMG and retains raw builds. It applies latest stable maximum UPX where supported, but intentionally skips UPX -t, runtime smoke, native test programs and DMG/signature roundtrip validation. dist/development-artifacts.json marks checks=not_run; publish-local-release.ps1 refuses these exact files as ready releases. To refresh only changed Unix candidates while preserving existing Windows ZIPs, use package-development.py --ports-only.
+
+Normal checked packaging remains separate: package-ports-windows.py --target macos|linux|all supports independent platform packaging, preserves untouched platform metadata and refuses rewriting a published Linux version. Historical commands/results above are not evidence for this new candidate.

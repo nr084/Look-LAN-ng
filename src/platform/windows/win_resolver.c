@@ -1,6 +1,7 @@
 #include "win_resolver.h"
 #include <ws2tcpip.h>
 #include <windns.h>
+#include "win_sdk_compat.h"
 #include <stdio.h>
 #include <wchar.h>
 
