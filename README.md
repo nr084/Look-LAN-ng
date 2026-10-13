@@ -10,13 +10,13 @@
 
 | Платформа / Platform | Проверенный релиз / Verified release | Поставка / Package |
 | --- | --- | --- |
-| macOS universal arm64 + x86_64 | [1.3.1](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.1) | DMG |
+| macOS universal arm64 + x86_64 | [1.3.2](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.2) | DMG |
 | Linux x64 | [1.3.0](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.0) | ZIP |
 | Windows x86 / x64 / ARM64 | [1.2.0](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.2.0) | One EXE per architecture ZIP |
 
-Текущий релиз **1.3.1 содержит только macOS**. Windows/Linux история сохранена; новые непроверенные кандидаты не опубликованы.
+Текущий релиз **1.3.2 содержит только macOS**. Windows/Linux история сохранена; новые непроверенные кандидаты не опубликованы.
 
-The current **1.3.1 release contains macOS only**. Existing Windows/Linux releases are preserved; unvalidated development candidates are not published.
+The current **1.3.2 release contains macOS only**. Existing Windows/Linux releases are preserved; unvalidated development candidates are not published.
 
 ## macOS
 
@@ -40,13 +40,13 @@ ARP cache alone does not prove ONLINE; OS hints are probabilistic. Device notes/
 
 ## Реальные скриншоты / Actual screenshots
 
-macOS 1.3.1, русский интерфейс, итоговая сборка / Russian UI, final build:
+macOS 1.3.2, русский интерфейс, итоговая сборка / Russian UI, final build:
 
-![macOS 1.3.1 RU](docs/images/macos-1.3.1-ru.png)
+![macOS 1.3.2 RU](docs/images/macos-1.3.2-ru.png)
 
-macOS 1.3.1, English UI, final build:
+macOS 1.3.2, English UI, final build:
 
-![macOS 1.3.1 EN](docs/images/macos-1.3.1-en.png)
+![macOS 1.3.2 EN](docs/images/macos-1.3.2-en.png)
 
 [Windows 1.2.0 screenshot](docs/images/windows-1.2.0.png) · [Linux 1.3.0 screenshot](docs/images/linux-1.3.0.png)
 

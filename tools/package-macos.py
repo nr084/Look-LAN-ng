@@ -92,7 +92,9 @@ def main():
         'runtime_validation': 'see build/validation/macos-native and docs/MACOS_VALIDATION.md',
         'published': False,
     }
-    (ROOT / 'dist/macos-native-package.json').write_text(json.dumps(metadata, indent=2) + '\n')
+    (output / 'package.json').write_text(json.dumps(metadata, indent=2) + '\n')
+    if args.release:
+        (ROOT / 'dist/macos-native-package.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(asset)
     print(json.dumps(metadata, indent=2))
 

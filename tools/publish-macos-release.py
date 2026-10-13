@@ -5,6 +5,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,7 +73,13 @@ def main():
         found = next(a for a in release['assets'] if a['name'] == file.name)
         if found.get('digest') != 'sha256:' + digest(file) or found['size'] != file.stat().st_size:
             raise SystemExit('GitHub upload integrity mismatch')
-    run('gh', 'release', 'edit', tag, '--repo', REPOSITORY, '--draft=false', '--latest', '--notes-file', args.notes)
+    # Include the tag explicitly when finalizing a draft; preserve its identity.
+    with tempfile.TemporaryDirectory(prefix='looklan-publish-') as temp:
+        payload = Path(temp) / 'release.json'
+        payload.write_text(json.dumps({'tag_name': tag, 'draft': False, 'prerelease': False,
+                                       'make_latest': 'true', 'body': args.notes.read_text()}))
+        run('gh', 'api', '--method', 'PATCH', f'repos/{REPOSITORY}/releases/{release["id"]}',
+            '--input', payload)
     final = release_by_tag(tag)
     if final['draft'] or final['prerelease']:
         raise SystemExit('Release did not publish as stable')

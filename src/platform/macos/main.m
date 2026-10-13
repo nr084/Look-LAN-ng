@@ -5,13 +5,16 @@
 #include <stdlib.h>
 #include "statistics.h"
 static NSString *text(const char *s){return [NSString stringWithUTF8String:s] ?: @"";}
-@interface LANDelegate : NSObject <NSApplicationDelegate,NSTableViewDataSource,NSTableViewDelegate,NSToolbarDelegate,NSWindowDelegate,NSTextFieldDelegate,NSOutlineViewDataSource,NSOutlineViewDelegate,NSSplitViewDelegate>
+@interface LANDelegate : NSObject <NSApplicationDelegate,NSTableViewDataSource,NSTableViewDelegate,NSToolbarDelegate,NSWindowDelegate,NSTextFieldDelegate,NSOutlineViewDataSource,NSOutlineViewDelegate,NSSplitViewDelegate,NSTabViewDelegate>
 @property NSWindow *window;
 @property NSTableView *table,*logTable;
 @property uint64_t logSequence;
 @property NSPopUpButton *interfaces;
 @property NSTextField *range,*filter,*status;
-@property NSTextField *networkInfo;
+@property NSTextField *networkInfo,*emptyState;
+@property NSScrollView *hostScroll,*sidebarScroll;
+@property NSView *detailPane;
+@property NSSegmentedControl *detailSelector;
 @property NSTabView *detailTabs;
 @property NSSplitView *networkSplit,*hostSplit;
 @property NSMutableArray<NSTextView *> *detailViews;
@@ -54,7 +57,7 @@ static desktop_app_t app;
     (void)notification;self.systemLanguage=NSLocale.preferredLanguages.firstObject ?: @"en";
     if(!desktop_init(&app,self.systemLanguage.UTF8String))exit(EXIT_FAILURE);
     self.window=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,1120,720) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
-    self.window.title=@"Look@LAN-ng " @APP_VERSION;self.window.minSize=NSMakeSize(760,500);self.window.delegate=self;[self.window center];[self.window setFrameAutosaveName:@"LookLAN-main"];
+    self.window.title=@"Look@LAN-ng " @APP_VERSION;self.window.minSize=NSMakeSize(900,560);self.window.delegate=self;[self.window center];[self.window setFrameAutosaveName:@"LookLAN-main"];
     NSView *content=self.window.contentView;
     self.interfaces=[[NSPopUpButton alloc]initWithFrame:NSMakeRect(14,674,310,28) pullsDown:NO];self.interfaces.target=self;self.interfaces.action=@selector(selectInterface:);self.interfaces.autoresizingMask=NSViewMinYMargin;
     self.range=[[NSTextField alloc]initWithFrame:NSMakeRect(334,674,310,28)];self.range.autoresizingMask=NSViewMinYMargin;
@@ -63,43 +66,78 @@ static desktop_app_t app;
     [content addSubview:self.interfaces];[content addSubview:self.range];[content addSubview:self.filter];
     self.networkInfo=[NSTextField labelWithString:@""];self.networkInfo.frame=NSMakeRect(14,644,1092,22);self.networkInfo.autoresizingMask=NSViewMinYMargin|NSViewWidthSizable;self.networkInfo.lineBreakMode=NSLineBreakByTruncatingTail;[content addSubview:self.networkInfo];
     NSScrollView *scroll=[[NSScrollView alloc]initWithFrame:NSMakeRect(240,202,866,432)];scroll.hasVerticalScroller=YES;scroll.hasHorizontalScroller=YES;scroll.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
-    self.table=[[NSTableView alloc]initWithFrame:scroll.bounds];self.table.dataSource=self;self.table.delegate=self;self.table.usesAlternatingRowBackgroundColors=YES;self.table.rowSizeStyle=NSTableViewRowSizeStyleMedium;self.table.autosaveName=@"LookLAN-columns";self.table.autosaveTableColumns=YES;self.table.target=self;self.table.doubleAction=@selector(showGeneral:);
-    const CGFloat widths[]={105,130,175,165,180,130,90,150,170,170};
+    self.table=[[NSTableView alloc]initWithFrame:scroll.bounds];self.table.dataSource=self;self.table.delegate=self;self.table.usesAlternatingRowBackgroundColors=NO;self.table.style=NSTableViewStyleFullWidth;self.table.rowHeight=26;self.table.autosaveName=@"LookLAN-columns-v2";self.table.autosaveTableColumns=YES;self.table.target=self;self.table.doubleAction=@selector(showGeneral:);
+    const CGFloat widths[]={116,122,154,148,156,124,82,128,150,150};
     for(unsigned c=0;c<10;++c){NSTableColumn *column=[[NSTableColumn alloc]initWithIdentifier:[NSString stringWithFormat:@"%u",c]];column.width=widths[c];column.sortDescriptorPrototype=[NSSortDescriptor sortDescriptorWithKey:column.identifier ascending:YES];[self.table addTableColumn:column];}
-    scroll.documentView=self.table;
+    scroll.documentView=self.table;scroll.borderType=NSNoBorder;self.hostScroll=scroll;
+    self.emptyState=[NSTextField wrappingLabelWithString:@""];self.emptyState.alignment=NSTextAlignmentCenter;self.emptyState.textColor=NSColor.secondaryLabelColor;self.emptyState.font=[NSFont systemFontOfSize:14];[scroll addSubview:self.emptyState];
     NSScrollView *sideScroll=[[NSScrollView alloc]initWithFrame:NSMakeRect(14,40,216,594)];sideScroll.hasVerticalScroller=YES;sideScroll.hasHorizontalScroller=YES;sideScroll.autoresizingMask=NSViewHeightSizable;
-    self.sidebar=[[NSOutlineView alloc]initWithFrame:sideScroll.bounds];NSTableColumn *sideColumn=[[NSTableColumn alloc]initWithIdentifier:@"network"];sideColumn.width=210;[self.sidebar addTableColumn:sideColumn];self.sidebar.outlineTableColumn=sideColumn;self.sidebar.headerView=nil;self.sidebar.dataSource=self;self.sidebar.delegate=self;sideScroll.documentView=self.sidebar;
-    self.detailTabs=[[NSTabView alloc]initWithFrame:NSMakeRect(240,40,866,150)];self.detailTabs.autoresizingMask=NSViewWidthSizable;self.detailViews=[NSMutableArray new];
-    for(unsigned i=0;i<6;++i){NSTabViewItem *item=[[NSTabViewItem alloc]initWithIdentifier:@(i)];NSScrollView *details=[[NSScrollView alloc]initWithFrame:self.detailTabs.contentRect];details.hasVerticalScroller=YES;details.hasHorizontalScroller=YES;details.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;if(i==5){self.logTable=[[NSTableView alloc]initWithFrame:details.bounds];self.logTable.dataSource=self;self.logTable.delegate=self;const CGFloat widths[]={160,200,140,380};for(unsigned col=0;col<4;++col){NSTableColumn *column=[[NSTableColumn alloc]initWithIdentifier:[NSString stringWithFormat:@"%u",col]];column.width=widths[col];[self.logTable addTableColumn:column];}details.documentView=self.logTable;item.view=details;[self.detailTabs addTabViewItem:item];continue;}NSTextView *view=[[NSTextView alloc]initWithFrame:details.bounds];view.editable=NO;view.font=[NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];details.documentView=view;item.view=details;[self.detailViews addObject:view];[self.detailTabs addTabViewItem:item];}
-    self.networkSplit=[[NSSplitView alloc]initWithFrame:NSMakeRect(14,40,1092,594)];self.networkSplit.vertical=YES;self.networkSplit.dividerStyle=NSSplitViewDividerStyleThin;self.networkSplit.delegate=self;self.networkSplit.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
+    self.sidebar=[[NSOutlineView alloc]initWithFrame:sideScroll.bounds];NSTableColumn *sideColumn=[[NSTableColumn alloc]initWithIdentifier:@"network"];sideColumn.width=210;[self.sidebar addTableColumn:sideColumn];self.sidebar.outlineTableColumn=sideColumn;self.sidebar.headerView=nil;self.sidebar.dataSource=self;self.sidebar.delegate=self;sideScroll.documentView=self.sidebar;sideScroll.borderType=NSNoBorder;self.sidebar.rowSizeStyle=NSTableViewRowSizeStyleSmall;self.sidebar.style=NSTableViewStyleSourceList;self.sidebarScroll=sideScroll;
+    self.detailTabs=[[NSTabView alloc]initWithFrame:NSMakeRect(240,40,866,150)];self.detailTabs.autoresizingMask=NSViewWidthSizable;self.detailViews=[NSMutableArray new];self.detailTabs.tabViewType=NSNoTabsNoBorder;self.detailTabs.delegate=self;
+    self.detailPane=[[NSView alloc]initWithFrame:NSMakeRect(0,0,866,190)];self.detailSelector=[[NSSegmentedControl alloc]initWithFrame:NSMakeRect(12,158,600,26)];self.detailSelector.segmentCount=6;self.detailSelector.trackingMode=NSSegmentSwitchTrackingSelectOne;self.detailSelector.segmentStyle=NSSegmentStyleTexturedRounded;self.detailSelector.target=self;self.detailSelector.action=@selector(selectDetail:);self.detailSelector.selectedSegment=0;[self.detailPane addSubview:self.detailSelector];[self.detailPane addSubview:self.detailTabs];
+    for(unsigned i=0;i<6;++i){NSTabViewItem *item=[[NSTabViewItem alloc]initWithIdentifier:@(i)];NSScrollView *details=[[NSScrollView alloc]initWithFrame:self.detailTabs.contentRect];details.hasVerticalScroller=YES;details.hasHorizontalScroller=i==5;details.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;if(i==5){self.logTable=[[NSTableView alloc]initWithFrame:details.bounds];self.logTable.dataSource=self;self.logTable.delegate=self;const CGFloat widths[]={160,200,140,380};for(unsigned col=0;col<4;++col){NSTableColumn *column=[[NSTableColumn alloc]initWithIdentifier:[NSString stringWithFormat:@"%u",col]];column.width=widths[col];[self.logTable addTableColumn:column];}details.documentView=self.logTable;item.view=details;[self.detailTabs addTabViewItem:item];continue;}NSTextView *view=[[NSTextView alloc]initWithFrame:details.bounds];view.editable=NO;view.textContainerInset=NSMakeSize(12,10);view.font=[NSFont monospacedSystemFontOfSize:12 weight:NSFontWeightRegular];view.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;view.verticallyResizable=YES;view.horizontallyResizable=NO;view.textContainer.widthTracksTextView=YES;details.documentView=view;item.view=details;[self.detailViews addObject:view];[self.detailTabs addTabViewItem:item];}
+    self.networkSplit=[[NSSplitView alloc]initWithFrame:NSMakeRect(14,40,1092,594)];self.networkSplit.vertical=YES;self.networkSplit.dividerStyle=NSSplitViewDividerStyleThin;self.networkSplit.delegate=self;self.networkSplit.autoresizingMask=NSViewNotSizable;
     self.hostSplit=[[NSSplitView alloc]initWithFrame:NSMakeRect(0,0,866,594)];self.hostSplit.vertical=NO;self.hostSplit.dividerStyle=NSSplitViewDividerStyleThin;self.hostSplit.delegate=self;
     sideScroll.frame=NSMakeRect(0,0,216,594);scroll.frame=NSMakeRect(0,0,866,424);self.detailTabs.frame=NSMakeRect(0,0,866,170);self.detailTabs.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
-    [self.hostSplit addSubview:scroll];[self.hostSplit addSubview:self.detailTabs];[self.hostSplit adjustSubviews];[self.hostSplit setPosition:424 ofDividerAtIndex:0];
+    [self.hostSplit addSubview:scroll];[self.hostSplit addSubview:self.detailPane];[self.hostSplit adjustSubviews];[self.hostSplit setPosition:424 ofDividerAtIndex:0];
     [self.networkSplit addSubview:sideScroll];[self.networkSplit addSubview:self.hostSplit];[self.networkSplit adjustSubviews];[self.networkSplit setPosition:216 ofDividerAtIndex:0];
-    self.networkSplit.autosaveName=@"LookLAN-network-split";self.hostSplit.autosaveName=@"LookLAN-details-split";[content addSubview:self.networkSplit];
-    self.status=[NSTextField labelWithString:@""];self.status.frame=NSMakeRect(14,10,1092,22);self.status.autoresizingMask=NSViewWidthSizable;[content addSubview:self.status];
-    self.visible=[NSMutableArray new];[self populateInterfaces];[self localize];
+    self.networkSplit.autosaveName=@"LookLAN-network-split-v2";self.hostSplit.autosaveName=@"LookLAN-details-split-v2";[content addSubview:self.networkSplit];
+    self.status=[NSTextField labelWithString:@""];self.status.frame=NSMakeRect(14,10,1092,22);self.status.autoresizingMask=NSViewWidthSizable;self.status.font=[NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightRegular];self.status.textColor=NSColor.secondaryLabelColor;self.networkInfo.font=[NSFont systemFontOfSize:11];self.networkInfo.textColor=NSColor.secondaryLabelColor;[content addSubview:self.status];
+    self.visible=[NSMutableArray new];[self layoutTopControls];[self populateInterfaces];[self localize];
     NSMenu *context=[NSMenu new];NSArray *contextNames=@[[self tr:"Copy IP" ru:"Копировать IP"],[self tr:"Copy MAC" ru:"Копировать MAC"],[self tr:"Properties" ru:"Свойства"],[self tr:"Acknowledge" ru:"Подтвердить"],[self tr:"Rescan host" ru:"Повторно проверить узел"],@"Web",@"HTTPS",@"SSH",@"SMB",@"RDP",[self tr:"Copy hostname" ru:"Копировать имя узла"],@"Ping",@"Traceroute",[self tr:"Scan ports" ru:"Проверить порты"]];for(NSUInteger i=0;i<contextNames.count;++i){NSMenuItem *item=[context addItemWithTitle:contextNames[i] action:@selector(contextAction:) keyEquivalent:@""];item.target=self;item.tag=(NSInteger)i;}self.table.menu=context;
     self.timer=[NSTimer timerWithTimeInterval:.05 target:self selector:@selector(tick:) userInfo:nil repeats:YES];[[NSRunLoop mainRunLoop]addTimer:self.timer forMode:NSRunLoopCommonModes];[[NSRunLoop mainRunLoop]addTimer:self.timer forMode:NSModalPanelRunLoopMode];desktop_reload_profiles(&app);
     [self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
 }
-- (CGFloat)splitView:(NSSplitView *)split constrainMinCoordinate:(CGFloat)proposed ofSubviewAt:(NSInteger)index{(void)proposed;(void)index;return split==self.networkSplit ? 150:150;}
-- (CGFloat)splitView:(NSSplitView *)split constrainMaxCoordinate:(CGFloat)proposed ofSubviewAt:(NSInteger)index{(void)proposed;(void)index;return split==self.networkSplit ? MAX(150,split.bounds.size.width-360):MAX(150,split.bounds.size.height-120);}
+- (CGFloat)splitView:(NSSplitView *)split constrainMinCoordinate:(CGFloat)proposed ofSubviewAt:(NSInteger)index{(void)proposed;(void)index;return split==self.networkSplit ? 190:180;}
+- (CGFloat)splitView:(NSSplitView *)split constrainMaxCoordinate:(CGFloat)proposed ofSubviewAt:(NSInteger)index{(void)proposed;(void)index;return split==self.networkSplit ? MIN(300,MAX(190,split.bounds.size.width-500)):MAX(180,split.bounds.size.height-170);}
 - (BOOL)splitView:(NSSplitView *)split canCollapseSubview:(NSView *)view{(void)split;(void)view;return NO;}
 - (void)layoutTopControls {
-    CGFloat width=self.window.contentView.bounds.size.width;
-    CGFloat y=self.window.contentView.bounds.size.height-46;
-    CGFloat available=MAX(0,width-48),nic=available*.28,ranges=available*.35;
-    self.interfaces.frame=NSMakeRect(14,y,nic,28);
-    self.range.frame=NSMakeRect(24+nic,y,ranges,28);
-    self.filter.frame=NSMakeRect(34+nic+ranges,y,available-nic-ranges,28);
+    NSSize size=self.window.contentView.bounds.size;CGFloat width=size.width,height=size.height;
+    CGFloat margin=12,gap=10,available=MAX(0,width-2*margin-2*gap);
+    CGFloat nic=MIN(290,available*.29),ranges=MIN(420,available*.37);
+    self.interfaces.frame=NSMakeRect(margin,height-42,nic,28);
+    self.range.frame=NSMakeRect(margin+nic+gap,height-42,ranges,28);
+    self.filter.frame=NSMakeRect(margin+nic+ranges+2*gap,height-42,available-nic-ranges,28);
+    self.networkInfo.frame=NSMakeRect(margin,height-66,width-2*margin,18);
+    self.networkSplit.frame=NSMakeRect(0,30,width,MAX(0,height-104));
+    self.status.frame=NSMakeRect(margin,7,width-2*margin,16);
+    [self layoutSplit:self.networkSplit];[self layoutSplit:self.hostSplit];[self layoutDetailPane];
+    NSSize viewport=self.hostScroll.contentView.bounds.size;
+    self.emptyState.frame=NSMakeRect(20,MAX(20,(viewport.height-64)/2),MAX(0,viewport.width-40),64);
 }
+- (void)layoutDetailPane {
+    NSSize size=self.detailPane.bounds.size;
+    self.detailSelector.frame=NSMakeRect(12,MAX(0,size.height-34),MIN(610,MAX(0,size.width-24)),26);
+    self.detailTabs.frame=NSMakeRect(0,0,size.width,MAX(0,size.height-42));
+}
+- (void)layoutSplit:(NSSplitView *)split {
+    if(split.subviews.count!=2)return;
+    CGFloat divider=split.dividerThickness;NSSize size=split.bounds.size;
+    if(split==self.networkSplit){
+        CGFloat sidebar=MIN(300,MAX(190,NSWidth(split.subviews[0].frame)));
+        sidebar=MIN(sidebar,MAX(0,size.width-500));
+        split.subviews[0].frame=NSMakeRect(0,0,sidebar,size.height);
+        split.subviews[1].frame=NSMakeRect(sidebar+divider,0,MAX(0,size.width-sidebar-divider),size.height);
+        [self layoutSplit:self.hostSplit];
+    }else{
+        CGFloat detail=MIN(300,MAX(170,NSHeight(split.subviews[1].frame)));
+        detail=MIN(detail,MAX(0,size.height-180));CGFloat tableHeight=MAX(0,size.height-detail-divider);
+        split.subviews[0].frame=NSMakeRect(0,split.isFlipped ? 0:detail+divider,size.width,tableHeight);
+        split.subviews[1].frame=NSMakeRect(0,split.isFlipped ? tableHeight+divider:0,size.width,detail);
+        [self layoutDetailPane];
+        NSSize viewport=self.hostScroll.contentView.bounds.size;
+        self.emptyState.frame=NSMakeRect(20,MAX(20,(viewport.height-64)/2),MAX(0,viewport.width-40),64);
+    }
+}
+- (void)splitViewDidResizeSubviews:(NSNotification *)notification{(void)notification;[self layoutDetailPane];}
 - (void)windowDidResize:(NSNotification *)notification{(void)notification;[self layoutTopControls];}
+- (void)selectDetail:(NSSegmentedControl *)sender{if(sender.selectedSegment>=0)[self.detailTabs selectTabViewItemAtIndex:sender.selectedSegment];}
+- (void)tabView:(NSTabView *)view didSelectTabViewItem:(NSTabViewItem *)item{(void)view;self.detailSelector.selectedSegment=[self.detailTabs indexOfTabViewItem:item];}
 - (void)showGeneral:(id)sender{(void)sender;if(app.closing || self.table.selectedRow<0)return;[self.detailTabs selectTabViewItemAtIndex:0];}
 - (void)localize {
-    [self menu];NSArray *tabs=app.russian ? @[@"Общее",@"Порты",@"Ping",@"Trace",@"История",@"Журнал"] : @[@"General",@"Ports",@"Ping",@"Trace",@"History",@"Log"];for(NSUInteger i=0;i<6;++i)self.detailTabs.tabViewItems[i].label=tabs[i];[self populateSidebar];NSArray *logTitles=app.russian ? @[@"Время",@"Событие",@"IP-адрес",@"Подробности"]:@[@"Time",@"Event",@"IP Address",@"Details"];for(NSUInteger i=0;i<4;++i)self.logTable.tableColumns[i].title=logTitles[i];[self.logTable reloadData];NSArray *titles=app.russian ? @[@"Статус",@"IP-адрес",@"Имя узла",@"MAC-адрес",@"Производитель",@"Устройство / ОС",@"Задержка",@"Сервисы",@"Первый ответ",@"Последний ответ"] : @[@"Status",@"IP Address",@"Host Name",@"MAC Address",@"Vendor",@"Device / OS",@"Latency",@"Services",@"First Seen",@"Last Seen"];
+    [self menu];NSArray *tabs=app.russian ? @[@"Общее",@"Порты",@"Ping",@"Trace",@"История",@"Журнал"] : @[@"General",@"Ports",@"Ping",@"Trace",@"History",@"Log"];for(NSUInteger i=0;i<6;++i){self.detailTabs.tabViewItems[i].label=tabs[i];[self.detailSelector setLabel:tabs[i] forSegment:(NSInteger)i];}[self populateSidebar];NSArray *logTitles=app.russian ? @[@"Время",@"Событие",@"IP-адрес",@"Подробности"]:@[@"Time",@"Event",@"IP Address",@"Details"];for(NSUInteger i=0;i<4;++i)self.logTable.tableColumns[i].title=logTitles[i];[self.logTable reloadData];NSArray *titles=app.russian ? @[@"Статус",@"IP-адрес",@"Имя узла",@"MAC-адрес",@"Производитель",@"Устройство / ОС",@"Задержка",@"Сервисы",@"Первый ответ",@"Последний ответ"] : @[@"Status",@"IP Address",@"Host Name",@"MAC Address",@"Vendor",@"Device / OS",@"Latency",@"Services",@"First Seen",@"Last Seen"];
     for(NSUInteger c=0;c<10;++c)self.table.tableColumns[c].title=titles[c];self.filter.placeholderString=[self tr:"Filter hosts…" ru:"Фильтр устройств…"];self.range.placeholderString=[self tr:"Use all profile ranges" ru:"Все диапазоны профиля"];
-    NSToolbar *toolbar=[[NSToolbar alloc]initWithIdentifier:@"LookLAN-toolbar"];toolbar.delegate=self;toolbar.displayMode=NSToolbarDisplayModeIconAndLabel;toolbar.allowsUserCustomization=NO;self.window.toolbar=toolbar;self.window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;[self refreshRows];
+    NSToolbar *toolbar=[[NSToolbar alloc]initWithIdentifier:@"LookLAN-toolbar"];toolbar.delegate=self;toolbar.displayMode=NSToolbarDisplayModeIconOnly;toolbar.allowsUserCustomization=NO;self.window.toolbar=toolbar;self.window.toolbarStyle=NSWindowToolbarStyleUnifiedCompact;[self refreshRows];
     NSArray *contextNames=@[[self tr:"Copy IP" ru:"Копировать IP"],[self tr:"Copy MAC" ru:"Копировать MAC"],[self tr:"Properties" ru:"Свойства"],[self tr:"Acknowledge" ru:"Подтвердить"],[self tr:"Rescan host" ru:"Повторно проверить узел"]];for(NSUInteger i=0;i<MIN(contextNames.count,self.table.menu.itemArray.count);++i)self.table.menu.itemArray[i].title=contextNames[i];if(self.table.menu.numberOfItems>13){self.table.menu.itemArray[10].title=[self tr:"Copy hostname" ru:"Копировать имя узла"];self.table.menu.itemArray[13].title=[self tr:"Scan ports" ru:"Проверить порты"];}
 }
 - (NSArray *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar{(void)toolbar;return @[@"scan",@"stop",@"refresh",@"monitor",@"ping",@"trace",NSToolbarFlexibleSpaceItemIdentifier,@"export"];}
@@ -108,7 +146,8 @@ static desktop_app_t app;
     (void)toolbar;(void)flag;NSArray *ids=@[@"scan",@"stop",@"refresh",@"monitor",@"ping",@"trace",@"export"],*symbols=@[@"network",@"stop.fill",@"arrow.clockwise",@"waveform.path",@"antenna.radiowaves.left.and.right",@"point.3.connected.trianglepath.dotted",@"square.and.arrow.down"];
     NSUInteger i=[ids indexOfObject:identifier];if(i==NSNotFound)return nil;NSToolbarItem *item=[[NSToolbarItem alloc]initWithItemIdentifier:identifier];
     NSArray *labels=app.russian ? @[@"Сканировать",@"Стоп",@"Обновить",@"Мониторинг",@"Ping",@"Trace",@"Экспорт"] : @[@"Scan",@"Stop",@"Refresh",@"Monitoring",@"Ping",@"Trace",@"Export"];
-    item.label=labels[i];item.toolTip=labels[i];item.image=[NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:labels[i]];item.target=self;item.action=NSSelectorFromString(@[@"scan:",@"stop:",@"refresh:",@"monitoring:",@"ping:",@"trace:",@"export:"][i]);return item;
+    item.label=labels[i];item.toolTip=labels[i];item.target=self;item.action=NSSelectorFromString(@[@"scan:",@"stop:",@"refresh:",@"monitoring:",@"ping:",@"trace:",@"export:"][i]);
+    NSButton *button=[NSButton buttonWithTitle:labels[i] target:self action:item.action];button.image=[NSImage imageWithSystemSymbolName:symbols[i] accessibilityDescription:labels[i]];button.imagePosition=NSImageLeading;button.bezelStyle=NSBezelStyleTexturedRounded;button.controlSize=NSControlSizeSmall;button.font=[NSFont systemFontOfSize:12 weight:NSFontWeightMedium];[button sizeToFit];button.frame=NSMakeRect(0,0,MAX(62,button.frame.size.width+8),28);item.view=button;return item;
 }
 - (BOOL)validateToolbarItem:(NSToolbarItem *)item{if(app.closing)return NO;if([item.itemIdentifier isEqual:@"stop"])return app.scanning || app.monitoring || app.tools || app.io || app.names_pending;if([item.itemIdentifier isEqual:@"monitor"])return !app.closing && (app.monitoring || (!app.scanning && !app.tools && !app.io));if([item.itemIdentifier isEqual:@"ping"] || [item.itemIdentifier isEqual:@"trace"])return !app.scanning && !app.monitoring && !app.tools && !app.io && self.table.selectedRow>=0;if([item.itemIdentifier isEqual:@"scan"] && app.selected>=app.interface_count)return NO;return !app.scanning && !app.monitoring && !app.tools && !app.io && !app.closing;}
 - (void)populateInterfaces {
@@ -155,14 +194,14 @@ if(item.action==@selector(openProfile:) || item.action==@selector(editProfile:) 
     NSSortDescriptor *sort=self.table.sortDescriptors.firstObject;if(sort){[self.visible sortUsingComparator:^NSComparisonResult(NSNumber *first,NSNumber *second){int order=desktop_compare(&app,first.unsignedLongLongValue,second.unsignedLongLongValue,(unsigned)sort.key.intValue);if(!sort.ascending)order=-order;return order<0 ? NSOrderedAscending:order>0 ? NSOrderedDescending:NSOrderedSame;}];}[self.table reloadData];
     char status[512];desktop_status_text(&app,status,sizeof(status));self.status.stringValue=text(status);self.status.toolTip=text(status);
     if(hadSelection){NSUInteger selected=NSNotFound;for(NSUInteger i=0;i<self.visible.count;++i)if(ipv4_value(&app.hosts[self.visible[i].unsignedLongLongValue].address)==selectedIP){selected=i;break;}if(selected!=NSNotFound)[self.table selectRowIndexes:[NSIndexSet indexSetWithIndex:selected] byExtendingSelection:NO];else [self.table deselectAll:nil];}
-    [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification object:self.table]];self.sidebar.enabled=!app.scanning && !app.monitoring && !app.tools && !app.io;self.interfaces.enabled=!app.scanning && !app.monitoring && !app.tools && !app.io;self.range.enabled=!app.scanning && !app.monitoring && !app.tools && !app.io;[self.window.toolbar validateVisibleItems];
+    [self tableViewSelectionDidChange:[NSNotification notificationWithName:NSTableViewSelectionDidChangeNotification object:self.table]];self.sidebar.enabled=!app.scanning && !app.monitoring && !app.tools && !app.io;self.interfaces.enabled=!app.scanning && !app.monitoring && !app.tools && !app.io;self.range.enabled=!app.scanning && !app.monitoring && !app.tools && !app.io;[self.window.toolbar validateVisibleItems];for(NSToolbarItem *item in self.window.toolbar.items)if([item.view isKindOfClass:NSButton.class])((NSButton *)item.view).enabled=[self validateToolbarItem:item];self.emptyState.hidden=self.visible.count!=0;self.emptyState.stringValue=self.filter.stringValue.length ? [self tr:"No matching devices\nTry another search" ru:"Ничего не найдено\nИзмените фильтр"] : [self tr:"Discover your network\nSelect an interface and click Scan" ru:"Устройства вашей сети\nВыберите интерфейс и нажмите «Сканировать»"];
 }
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)table{if(table==self.logTable)return (NSInteger)app.monitor.log_count;return (NSInteger)self.visible.count;}
 - (NSView *)tableView:(NSTableView *)table viewForTableColumn:(NSTableColumn *)column row:(NSInteger)row {
     if(table==self.logTable){char value[600];desktop_log_cell(&app,(size_t)row,(unsigned)column.identifier.intValue,value,sizeof(value));NSTextField *label=[NSTextField labelWithString:text(value)];label.lineBreakMode=NSLineBreakByTruncatingTail;label.toolTip=text(value);return label;}
     NSTextField *label=[NSTextField labelWithString:@""];char value[512];if(row<0 || row>=(NSInteger)self.visible.count)return label;size_t index=self.visible[(NSUInteger)row].unsignedLongLongValue;if(index>=app.host_count)return label;desktop_cell(&app,index,(unsigned)column.identifier.intValue,value,sizeof(value));label.stringValue=text(value);label.lineBreakMode=NSLineBreakByTruncatingTail;if(column.identifier.intValue==0){const lan_host_t *host=&app.hosts[index];NSView *cell=[[NSView alloc]initWithFrame:NSMakeRect(0,0,column.width,24)];NSView *dot=[[NSView alloc]initWithFrame:NSMakeRect(4,9,7,7)];dot.wantsLayer=YES;dot.layer.cornerRadius=3.5;dot.layer.backgroundColor=(!host->first_seen || host->cache_only || !host->online ? NSColor.systemGrayColor:host->new_device ? NSColor.systemTealColor:host->changed ? NSColor.systemOrangeColor:NSColor.systemGreenColor).CGColor;label.frame=NSMakeRect(18,3,column.width-18,20);label.autoresizingMask=NSViewWidthSizable;[cell addSubview:dot];[cell addSubview:label];return cell;}return label;
 }
-- (void)tableViewSelectionDidChange:(NSNotification *)notification{if(notification.object==self.logTable)return;NSInteger row=self.table.selectedRow;size_t index=row>=0 && row<(NSInteger)self.visible.count ? self.visible[(NSUInteger)row].unsignedLongLongValue:SIZE_MAX;for(unsigned part=0;part<5;++part){char value[16384];desktop_detail_part(&app,index,part,value,sizeof(value));self.detailViews[part].string=text(value);}}
+- (void)tableViewSelectionDidChange:(NSNotification *)notification{if(notification.object==self.logTable)return;NSInteger row=self.table.selectedRow;size_t index=row>=0 && row<(NSInteger)self.visible.count ? self.visible[(NSUInteger)row].unsignedLongLongValue:SIZE_MAX;for(unsigned part=0;part<5;++part){char value[16384];desktop_detail_part(&app,index,part,value,sizeof(value));self.detailViews[part].string=index==SIZE_MAX ? [self tr:"Select a device in the table to see its details." ru:"Выберите устройство в таблице, чтобы увидеть подробности."]:text(value);}[self.window.toolbar validateVisibleItems];for(NSToolbarItem *item in self.window.toolbar.items)if([item.view isKindOfClass:NSButton.class])((NSButton *)item.view).enabled=[self validateToolbarItem:item];}
 - (void)diagnostic:(BOOL)trace{if(app.closing || app.scanning || app.monitoring || app.tools || app.io)return;NSInteger row=self.table.selectedRow;if(row<0 || row>=(NSInteger)self.visible.count || self.visible[(NSUInteger)row].unsignedLongLongValue>=app.host_count)return;const lan_host_t *host=&app.hosts[self.visible[(NSUInteger)row].unsignedLongLongValue];if(desktop_diagnostic(&app,ipv4_value(&host->address),trace))[self.detailTabs selectTabViewItemAtIndex:trace ? 3:2];else[self message:[self tr:"Cannot start diagnostic" ru:"Не удалось начать диагностику"]];[self refreshRows];}
 - (void)ping:(id)sender{(void)sender;[self diagnostic:NO];}
 - (void)trace:(id)sender{(void)sender;[self diagnostic:YES];}

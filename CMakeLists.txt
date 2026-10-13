@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(LookAtLANng VERSION 1.3.1 LANGUAGES C)
+project(LookAtLANng VERSION 1.3.2 LANGUAGES C)
 set(RELEASE_SUFFIX "")
 string(TIMESTAMP BUILD_YEAR "%Y")
 configure_file(src/resources/build_info.h.in generated/build_info.h @ONLY)
