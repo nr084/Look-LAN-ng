@@ -7,6 +7,8 @@
 *.rc text eol=lf
 *.manifest text eol=lf
 *.cmd text eol=crlf
+*.command text eol=lf
+*.sh text eol=lf
 *.bin binary
 *.ico binary
 *.png binary
