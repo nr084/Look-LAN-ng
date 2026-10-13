@@ -19,6 +19,15 @@ def run(*args):
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
+def release_by_tag(tag):
+    # Draft tags may not exist as public Git refs yet. Resolve the authenticated
+    # draft from the release listing, then use its stable numeric release ID.
+    listing = json.loads(run('gh', 'api', f'repos/{REPOSITORY}/releases?per_page=100'))
+    matches = [r for r in listing if r['tag_name'] == tag]
+    if len(matches) != 1:
+        raise SystemExit('Release tag is missing or ambiguous')
+    return json.loads(run('gh', 'api', f'repos/{REPOSITORY}/releases/{matches[0]["id"]}'))
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--version', required=True)
@@ -48,7 +57,7 @@ def main():
     if not existing:
         run('gh', 'release', 'create', tag, '--repo', REPOSITORY, '--target', commit,
             '--draft', '--title', 'Look@LAN-ng ' + args.version + ' — macOS', '--notes-file', args.notes)
-    release = json.loads(run('gh', 'api', f'repos/{REPOSITORY}/releases/tags/{tag}'))
+    release = release_by_tag(tag)
     for file in assets:
         found = next((a for a in release['assets'] if a['name'] == file.name), None)
         if found:
@@ -56,7 +65,7 @@ def main():
                 raise SystemExit('Existing draft asset differs')
         else:
             run('gh', 'release', 'upload', tag, file, '--repo', REPOSITORY)
-    release = json.loads(run('gh', 'api', f'repos/{REPOSITORY}/releases/tags/{tag}'))
+    release = release_by_tag(tag)
     if {a['name'] for a in release['assets']} != {f.name for f in assets}:
         raise SystemExit('Unexpected draft assets')
     for file in assets:
@@ -64,7 +73,7 @@ def main():
         if found.get('digest') != 'sha256:' + digest(file) or found['size'] != file.stat().st_size:
             raise SystemExit('GitHub upload integrity mismatch')
     run('gh', 'release', 'edit', tag, '--repo', REPOSITORY, '--draft=false', '--latest', '--notes-file', args.notes)
-    final = json.loads(run('gh', 'api', f'repos/{REPOSITORY}/releases/tags/{tag}'))
+    final = release_by_tag(tag)
     if final['draft'] or final['prerelease']:
         raise SystemExit('Release did not publish as stable')
     print(final['html_url'])
