@@ -1,3 +1,22 @@
+# Current platform workflow — 13 October 2026
+
+macOS is now compiled, packaged and tested locally on Mac. Windows cross-compilation of macOS is retired; the Windows port scripts default to Linux and reject macOS targets. Windows and Linux compilation remain local on Windows. No GitHub Actions compilation.
+
+On macOS with Xcode Command Line Tools, Python 3 and CMake:
+
+```sh
+./tools/build-macos.sh
+cmake -E env --unset=HOME ctest --test-dir build/macos-native-universal --output-on-failure
+```
+
+This produces a Release universal arm64+x86_64 app for macOS 13+ in `build/macos-native-universal/Look@LAN-ng.app`, using a separate cache from historical Windows cross-builds. A local CMake installation under build/native-tools is also detected. Native tests use the actual host architecture; Rosetta/Intel evidence is recorded separately. Temporary fixtures must be removed; current outputs and validation logs are retained.
+
+Create a candidate DMG with `python3 tools/package-macos.py`, or an explicitly requested stable package with `python3 tools/package-macos.py --release`: native codesign, ULMO/LZMA, integrity/mount/hash/mode verification, raw diagnostics retained. This does not publish or certify the full validation matrix. Publish a verified Mac release using `tools/publish-macos-release.py`: it checks exact native-proof hashes, source commit, draft uploads and GitHub digests before making the release latest. This workspace builds macOS only. `package-development.py` on Windows now packages only Windows/Linux candidates.
+
+The sections below describe historical workflows. Their macOS-on-Windows commands and implementation-only test restriction are superseded by this section.
+
+---
+
 # Сборка и проверки
 
 Требования: Windows x64, MSVC v143 из Visual Studio Build Tools 2022, Windows 10/11 SDK, CMake и Ninja. Установщик сборочных инструментов нужен только разработчику, не пользователю EXE.

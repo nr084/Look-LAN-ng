@@ -44,7 +44,9 @@ def write_zip(output,files):
             entry=zipfile.ZipInfo(name);entry.create_system=3;entry.external_attr=mode<<16;entry.compress_type=zipfile.ZIP_DEFLATED
             z.writestr(entry,source.read_bytes(),compresslevel=9)
 def main():
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--development',action='store_true',help='Local candidate only; skip checks at explicit user request');parser.add_argument('--target',choices=('all','macos','linux'),default='all');parser.add_argument('--tools-root',type=Path,default=ROOT.parent/'KiTTY-NG/_tools');args=parser.parse_args()
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--development',action='store_true',help='Local candidate only; skip checks at explicit user request');parser.add_argument('--target',choices=('all','macos','linux'),default='linux');parser.add_argument('--tools-root',type=Path,default=ROOT.parent/'KiTTY-NG/_tools');args=parser.parse_args()
+    if args.target != 'linux':
+        parser.error('macOS builds/packaging moved to Mac; use tools/build-macos.sh')
     tools=args.tools_root.resolve();upx,upx_version=upx_tool()
     summary_path=ROOT/'dist/ports-package.json'
     summary=json.loads(summary_path.read_text(encoding='utf-8')) if summary_path.exists() else {}

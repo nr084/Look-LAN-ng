@@ -30,9 +30,9 @@ def main():
             packager.write_zip(destination,[('Look@LAN-ng.exe',binary,0o100755)])
             summary['assets'][destination.name]=packager.digest(destination)
             summary['windows'][arch]={'file':destination.name,'compiler':'LLVM-MinGW' if arch=='arm64' else 'MSVC v143','upx':result,'runtime_tests':'not_run','raw':str(raw_dir.relative_to(ROOT))}
-    subprocess.run([sys.executable,str(ROOT/'tools/package-ports-windows.py'),'--development'],check=True)
+    subprocess.run([sys.executable,str(ROOT/'tools/package-ports-windows.py'),'--development','--target','linux'],check=True)
     ports=json.loads((ROOT/'dist/ports-package.json').read_text())
-    for platform in ('linux','macos'):
+    for platform in ('linux',):
         item=ports[platform]
         if item['version']!=version:raise RuntimeError('Platform versions differ')
         summary[platform]=item;summary['assets'][item['file']]=item['sha256']

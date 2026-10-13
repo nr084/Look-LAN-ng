@@ -1,10 +1,8 @@
 #!/bin/sh
-# Run the locally cross-built binaries on macOS without touching user settings.
+# Run the Mac-built binaries without reading or writing user settings.
 looklan_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)" || exit 1
 looklan_temp="$(mktemp -d -t looklan-validation)" || exit 1
 trap 'rm -rf -- "$looklan_temp"' EXIT HUP INT TERM
-mkdir -p "$looklan_temp/Library/Application Support" || exit 1
-export HOME="$looklan_temp"
 cd "$looklan_temp" || exit 1
 looklan_log="$looklan_dir/Native-tests.log"
 (
@@ -14,7 +12,7 @@ looklan_log="$looklan_dir/Native-tests.log"
     looklan_result=0
     for looklan_test in core_tests feature_tests monitor_tests profile_report_tests details_nbns_tests posix_runtime_tests; do
         printf '\n--- %s ---\n' "$looklan_test"
-        "$looklan_dir/Native-validation/$looklan_test"
+        env -u HOME "$looklan_dir/Native-validation/$looklan_test"
         looklan_status=$?
         printf 'Exit: %s\n' "$looklan_status"
         if [ "$looklan_status" -eq 77 ]; then

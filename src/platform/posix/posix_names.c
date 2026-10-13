@@ -68,8 +68,9 @@ static ssize_t exchange(posix_backend_t *b,uint32_t ip,unsigned port,const uint8
     if(!posix_pace(b))return -1;int fd=socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);if(fd<0)return -1;struct sockaddr_in source={0},peer={0};source.sin_family=peer.sin_family=AF_INET;source.sin_addr.s_addr=htonl(b->selected.ip);peer.sin_addr.s_addr=htonl(ip);peer.sin_port=htons((uint16_t)port);
     if(bind(fd,(struct sockaddr *)&source,sizeof(source)) || fcntl(fd,F_SETFL,O_NONBLOCK)<0 || fcntl(fd,F_SETFD,FD_CLOEXEC)<0){close(fd);return -1;}
 #ifdef __APPLE__
-    unsigned index=b->selected.index;/* A loopback resolver is a local OS endpoint. */
-    if((ip>>24)!=127 && setsockopt(fd,IPPROTO_IP,IP_BOUND_IF,&index,sizeof(index))){close(fd);return -1;}
+    unsigned index=b->selected.index;/* Local endpoints route through lo0 even when addressed by the NIC IP.
+       Keep the source bind, but do not pin them to the physical interface. */
+    if(ip!=b->selected.ip && (ip>>24)!=127 && setsockopt(fd,IPPROTO_IP,IP_BOUND_IF,&index,sizeof(index))){close(fd);return -1;}
 #elif defined(IP_UNICAST_IF)
     if((ip>>24)!=127){uint32_t index=htonl(b->selected.index);if(setsockopt(fd,IPPROTO_IP,IP_UNICAST_IF,&index,sizeof(index))){close(fd);return -1;}}
 #endif

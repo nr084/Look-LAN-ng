@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 project(LookAtLANng VERSION 1.3.1 LANGUAGES C)
-set(RELEASE_SUFFIX "-rc.1")
+set(RELEASE_SUFFIX "")
 string(TIMESTAMP BUILD_YEAR "%Y")
 configure_file(src/resources/build_info.h.in generated/build_info.h @ONLY)
 set(CMAKE_C_STANDARD 17)
@@ -64,6 +64,10 @@ if(UNIX)
     target_compile_options(LookAtLANng PRIVATE -fobjc-arc -Wall -Wextra -Wno-deprecated-declarations)
     target_link_libraries(LookAtLANng PRIVATE desktop_backend "-framework Cocoa")
     set_target_properties(LookAtLANng PROPERTIES OUTPUT_NAME "Look@LAN-ng" MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/src/resources/macos/Info.plist.in")
+    # Keep native and cross-built bundles self-contained with the same original icon.
+    add_custom_command(TARGET LookAtLANng POST_BUILD
+      COMMAND "${DESKTOP_HOST_PYTHON}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/macos-bundle-resources.py" "$<TARGET_BUNDLE_DIR:LookAtLANng>"
+      VERBATIM)
   else()
     if(LOOKLAN_TARGET_GTK)
       include("${LOOKLAN_TARGET_GTK}")

@@ -84,7 +84,7 @@ static void mac_trace(posix_tools_t *j){
        !(error=posix_spawn_file_actions_addclose(&actions,pipefd[0])))error=posix_spawn_file_actions_addclose(&actions,pipefd[1]);
     if(error){posix_spawn_file_actions_destroy(&actions);close(pipefd[0]);close(pipefd[1]);mac_trace_error(j);return;}
     char *argv[16]={"/usr/sbin/traceroute","-n","-s",source,"-m","30","-q","1","-w",timeout};unsigned argc=10;
-    if((j->target>>24)!=127){argv[argc++]="-i";argv[argc++]=j->backend.selected.name;}argv[argc++]=target;argv[argc]=NULL;
+    if(j->target!=j->backend.selected.ip && (j->target>>24)!=127){argv[argc++]="-i";argv[argc++]=j->backend.selected.name;}argv[argc++]=target;argv[argc]=NULL;
     size_t environment_count=0;while(environ[environment_count])++environment_count;
     char **environment=calloc(environment_count+2,sizeof(*environment));
     if(!environment){posix_spawn_file_actions_destroy(&actions);close(pipefd[0]);close(pipefd[1]);mac_trace_error(j);return;}

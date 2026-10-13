@@ -13,8 +13,10 @@ def main():
     global ENV
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--tools-root',type=Path,default=ROOT.parent/'KiTTY-NG/_tools')
-    parser.add_argument('--target',choices=['all','macos','linux'],default='all');args=parser.parse_args()
+    parser.add_argument('--target',choices=['all','macos','linux'],default='linux');args=parser.parse_args()
     if os.name!='nt':parser.error('This script executes compiler tools locally on Windows')
+    if args.target != 'linux':
+        parser.error('macOS builds/packaging moved to Mac; use tools/build-macos.sh')
     tools=args.tools_root.resolve();store=tools/'macos'
     llvm=sorted((store/'llvm').glob('*/bin/clang.exe'),key=lambda p:tuple(map(int,p.parents[1].name.split('.'))))[-1].parent
     cmake=next((store/'cmake').rglob('cmake.exe'));ninja=next((store/'ninja').rglob('ninja.exe'))

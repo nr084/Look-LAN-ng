@@ -1,3 +1,11 @@
+# Current macOS release — 1.3.1, 13 October 2026
+
+macOS is built and tested locally on Mac; this workspace builds macOS only. Stable 1.3.1 universal includes the mandatory implemented functionality. Six arm64 and six Rosetta x86_64 suites, both signed-app smoke modes, native Cocoa workflows/real LAN scan and 120-round monitoring/resource checks passed. Exact hashes, evidence and unavailable Intel/older macOS/physical NIC/DPI/long-runtime checks are recorded in MACOS_VALIDATION.md. Passing the full Definition of Done matrix is not claimed. Windows 1.2.0 and Linux 1.3.0 release evidence remains separate.
+
+The candidate/no-test/Mac-access statements below are historical.
+
+---
+
 # Реализация ТЗ — 1.3.1-rc.1
 
 13 октября 2026: по прямому указанию пользователя текущий этап выполнен без

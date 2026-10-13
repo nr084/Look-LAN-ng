@@ -10,6 +10,9 @@
 #include <netinet/in.h>
 #ifdef __linux__
 #include <dirent.h>
+#elif defined(__APPLE__)
+#include <libproc.h>
+#include <mach/mach.h>
 #endif
 #define CHECK(x) do { if(!(x)){fprintf(stderr,"FAIL %d: %s\n",__LINE__,#x);return 1;} } while(0)
 static uint64_t now(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return (uint64_t)t.tv_sec*1000+t.tv_nsec/1000000;}
@@ -19,7 +22,14 @@ static int descriptors(void){
 #ifdef __linux__
     DIR *d=opendir("/proc/self/fd");if(!d)return -1;int n=0;while(readdir(d))++n;closedir(d);return n;
 #else
+#ifdef __APPLE__
+    int size=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,NULL,0);if(size<=0)return -1;
+    struct proc_fdinfo *fds=malloc((size_t)size*2);if(!fds)return -1;
+    int bytes=proc_pidinfo(getpid(),PROC_PIDLISTFDS,0,fds,size*2);free(fds);
+    return bytes>0 ? bytes/(int)sizeof(struct proc_fdinfo):-1;
+#else
     return -1;
+#endif
 #endif
 }
 typedef struct {int socket;uint32_t expected;bool source_ok;} dns_fixture_t;
@@ -34,7 +44,12 @@ static size_t resident_kib(void){
     while(fgets(line,sizeof(line),file))if(sscanf(line,"VmRSS: %zu kB",&value)==1)break;
     fclose(file);return value;
 #else
+#ifdef __APPLE__
+    mach_task_basic_info_data_t info;mach_msg_type_number_t count=MACH_TASK_BASIC_INFO_COUNT;
+    return task_info(mach_task_self(),MACH_TASK_BASIC_INFO,(task_info_t)&info,&count)==KERN_SUCCESS ? (size_t)(info.resident_size/1024):0;
+#else
     return 0;
+#endif
 #endif
 }
 static int monitor_stress(void){
@@ -87,6 +102,13 @@ int main(int argc,char **argv){
     char directory[]="/tmp/looklan-native-XXXXXX";CHECK(mkdtemp(directory));char path[512];snprintf(path,sizeof(path),"%s/export.csv",directory);
     strcpy(a->hosts[0].hostname,"snapshot-name");CHECK(desktop_export(a,path,REPORT_CSV));strcpy(a->hosts[0].hostname,"changed-after-start");deadline=now()+10000;while(a->io && now()<deadline){desktop_poll(a);pause_tick();}CHECK(!a->io);
     FILE *file=fopen(path,"rb");CHECK(file);char contents[8192];size_t read=fread(contents,1,sizeof(contents)-1,file);contents[read]=0;fclose(file);CHECK(strstr(contents,"snapshot-name") && !strstr(contents,"changed-after-start"));unlink(path);
+    for(unsigned format=REPORT_TXT;format<=REPORT_HTML;++format){
+        snprintf(path,sizeof(path),"%s/export.%s",directory,format==REPORT_TXT ? "txt":"html");
+        CHECK(desktop_export(a,path,(report_format_t)format));deadline=now()+10000;
+        while(a->io && now()<deadline){desktop_poll(a);pause_tick();}CHECK(!a->io && !a->error[0]);
+        file=fopen(path,"rb");CHECK(file);read=fread(contents,1,sizeof(contents)-1,file);contents[read]=0;fclose(file);
+        CHECK(strstr(contents,"changed-after-start"));if(format==REPORT_HTML)CHECK(strstr(contents,"<html"));unlink(path);
+    }
     snprintf(path,sizeof(path),"%s/профиль.lanprofile",directory);CHECK(desktop_profile_save(a,path));deadline=now()+10000;while(a->io && now()<deadline){desktop_poll(a);pause_tick();}CHECK(!a->io);CHECK(desktop_profile_open(a,path));deadline=now()+10000;while(a->io && now()<deadline){desktop_poll(a);pause_tick();}CHECK(!a->io && !strcmp(a->profile.name,"Native profile"));unlink(path);
     lan_host_t *many=calloc(65536,sizeof(*many));CHECK(many);for(size_t i=0;i<65536;++i){many[i].address=ipv4_address((uint32_t)i);strcpy(many[i].hostname,"cancel-fixture");}
     snprintf(path,sizeof(path),"%s/cancel.html",directory);file=fopen(path,"wb");CHECK(file);fputs("original",file);fclose(file);desktop_io_t *io=desktop_io_start(DESKTOP_EXPORT,path,&a->profile,many,65536,&a->vendors,REPORT_HTML,false,NULL);CHECK(io);desktop_io_cancel(io);deadline=now()+10000;while(!desktop_io_finished(io) && now()<deadline)pause_tick();CHECK(desktop_io_finished(io));bool cancelled=false;bool committed=desktop_io_result(io,NULL,&cancelled);CHECK(cancelled);desktop_io_free(io);free(many);file=fopen(path,"rb");CHECK(file);read=fread(contents,1,sizeof(contents)-1,file);contents[read]=0;fclose(file);CHECK(committed || !strcmp(contents,"original"));unlink(path);rmdir(directory);

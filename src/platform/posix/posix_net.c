@@ -134,7 +134,7 @@ static int source_socket(posix_backend_t *b,int type,int protocol,uint32_t targe
     if(bind(fd,(struct sockaddr *)&source,sizeof(source)) || fcntl(fd,F_SETFL,O_NONBLOCK)<0 || fcntl(fd,F_SETFD,FD_CLOEXEC)<0) { close(fd); return -1; }
 #ifdef __APPLE__
     unsigned index=b->selected.index;
-    if((target>>24)!=127 && setsockopt(fd,IPPROTO_IP,IP_BOUND_IF,&index,sizeof(index))) { close(fd); return -1; }
+    if(target!=b->selected.ip && (target>>24)!=127 && setsockopt(fd,IPPROTO_IP,IP_BOUND_IF,&index,sizeof(index))) { close(fd); return -1; }
     int no_signal=1; setsockopt(fd,SOL_SOCKET,SO_NOSIGPIPE,&no_signal,sizeof(no_signal));
 #elif defined(IP_UNICAST_IF)
     if((target>>24)!=127){uint32_t index=htonl(b->selected.index);if(setsockopt(fd,IPPROTO_IP,IP_UNICAST_IF,&index,sizeof(index))){close(fd);return -1;}}
@@ -163,7 +163,7 @@ static scan_result_t tcp(void *context,uint32_t ip,uint16_t port,uint32_t timeou
         }
     }
     close(fd); if(!error) return SCAN_OK; if(error==ECONNREFUSED) return SCAN_REFUSED;
-    return error==ENETUNREACH || error==EHOSTUNREACH ? SCAN_NO_ROUTE : SCAN_TIMEOUT;
+    return error==ENETUNREACH || error==EHOSTUNREACH || error==EHOSTDOWN ? SCAN_NO_ROUTE : SCAN_TIMEOUT;
 }
 static uint16_t checksum(const uint8_t *data,size_t n) {
     uint32_t sum=0; for(size_t i=0;i+1<n;i+=2) sum+=((uint32_t)data[i]<<8)|data[i+1];
@@ -178,7 +178,14 @@ static scan_result_t ping(void *context,uint32_t ip,uint32_t timeout,lan_host_t 
     struct sockaddr_in target={0}; target.sin_family=AF_INET; target.sin_addr.s_addr=htonl(ip);
     uint8_t packet[16]={8,0,0,0,0,0,0,1,'L','O','O','K','L','A','N',0};
     uint16_t crc=checksum(packet,sizeof(packet)); packet[2]=(uint8_t)(crc>>8);packet[3]=(uint8_t)crc;
-    uint64_t started=milliseconds(); if(sendto(fd,packet,sizeof(packet),0,(struct sockaddr *)&target,sizeof(target))<0) { close(fd);return SCAN_SYSTEM_ERROR; }
+    uint64_t started=milliseconds(); if(sendto(fd,packet,sizeof(packet),0,(struct sockaddr *)&target,sizeof(target))<0) {
+        int error=errno;close(fd);
+        /* A failed neighbor/route for one target is a normal probe outcome,
+           not a backend failure that invalidates the entire monitoring round. */
+        if(error==ENETUNREACH || error==EHOSTUNREACH || error==EHOSTDOWN)return SCAN_NO_ROUTE;
+        if(error==EAGAIN || error==ENOBUFS)return SCAN_TIMEOUT;
+        return SCAN_SYSTEM_ERROR;
+    }
     uint64_t deadline=started+timeout; scan_result_t result=SCAN_TIMEOUT;
     for(;;) {
         int ready=wait_socket(b,fd,POLLIN,deadline); if(ready<=0) { if(ready==-2) result=SCAN_CANCELLED; break; }
