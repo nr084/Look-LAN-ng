@@ -28,3 +28,7 @@ Restored/resized window dimensions drive the layout. The table and detail pane f
 Intel hardware, older macOS, physical NIC unplug/display scaling, controlled ARP fixtures, full external-client and multi-hop Trace checks, and hours/days of GUI monitoring were not tested. Rosetta is not native Intel validation. macOS 13 is a deployment baseline, not a runtime test. No Gatekeeper/notarization success is claimed. Optional mDNS, active IPv6 and persistent disk history remain future scope.
 
 Evidence: build/validation/macos-native. Current raw diagnostics: build/unpacked/1.3.2/macos-native-universal. User settings/profiles are retained; obsolete local packages and temporary verification files are cleaned after publication. GitHub release history is retained.
+
+## Publication verification
+
+Published as latest stable: https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.2 . Both assets downloaded back and matched SHA-256; both final screenshots match the tagged bytes. Source commit: 5e862108e433e3dc040e2af73b77bbb251a9cba7. Old local Mac 1.3.1/1.3.2-rc.1 packages and raw binaries are removed; GitHub history, documentation, current platform builds and user settings/profiles retained.
