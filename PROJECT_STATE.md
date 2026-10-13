@@ -1,5 +1,7 @@
 # Current release work — 13 October 2026
 
+Published release: https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.0 (one Linux x64 ZIP; public Windows 1.2.0 history retained). Download-back ZIP SHA-256 matched the native-tested artifact. Completed VM test files were removed after fetching all evidence.
+
 Linux x64 **1.3.0 stable** is built locally on Windows, maximally UPX-packed and tested on the provided Ubuntu 26.04.1 VM. Exact final ZIP SHA-256: `743a896be8fe06118c0ec1ff4cf48ea492f14d19b2395003117f8b47523c5fc2`. Native suites and 39 GTK workflows passed against the final binary. 120 scheduled monitoring rounds (~10 minutes) kept FD 6 → 6, RSS 11548 → max 11680 KiB; Stop max 11 ms. Final real-LAN screenshots: docs/images/linux-1.3.0.png and windows-1.2.0.png (published Windows packed binary, not mock data).
 
 The Unix audit additionally removed all strcpy/sprintf calls from src, added a bounded non-truncating text helper, fixed PTR CNAME/case handling, source/MAC snapshot locking, sparse port profile round-trips above 8 KiB with a 64 KiB serialization limit and full Unicode Windows field reads. Workers are capped by actual target count. Both ports now have a native log table exposing the complete 10000-event ring. Windows regression: all 15 test cases passed; profile/UI/file tests rerun after fixing the newly exposed parser limit. Historical failed test outputs are retained privately.
