@@ -67,6 +67,4 @@ Final builds after real LAN scans, not sample data. IP addresses are blurred for
 | `look@lan-ng-arm64-1.3.2.zip` | `e438ee62294bbfc79859cc7f924f8019cf2b7214671621b9c27b9609a0bb8015` |
 | `look@lan-ng-linux-x64-1.3.2.zip` | `cc2fcc0b3591421a5a74c25883199299396071679f7d309a7be7081f0efa0132` |
 | `look@lan-ng-macos-universal-1.3.2.dmg` | `6ed919c223c43e0ee4d5962816e170693be089b7d7f027b9ea81d33487084a3c` |
-| `look@lan-ng-macos-diagnostics-1.3.2.zip` | `09698c323da3a5eb5afff04e8742de7dabe79b84af6c9aec7e0e2552928ff533` |
 
-Mac diagnostics ZIP is optional. © nr084, 2026 — year generated during build.

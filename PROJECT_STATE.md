@@ -43,3 +43,5 @@ Publication completed: https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.2 
 
 Cleanup completed: owned Ubuntu test directory, private CI validation draft and ephemeral file-read-only download secret deleted. Old local Windows 1.2.0 and Linux 1.3.0 deliveries removed after current packages were present; user INI/profiles and current raw builds/tools/reports retained. Flat Windows x64 EXE updated when writable. GitHub release history untouched.
 Screenshot privacy update (2026-10-14): current Windows, Ubuntu and macOS RU/EN screenshots have strong IP blur (built-in imagegen edit). Historical screenshot files removed from the current checkout at user request; historical release screenshot embeds removed. Release image URLs point to privacy-edited main copies. Original images remain in prior Git commits/tags; no Git history was rewritten.
+
+2026-10-14: user requested removal of all macOS diagnostic release assets from GitHub. Assets and related release-note rows/optional-ZIP sentence removed; local raw diagnostics retained.

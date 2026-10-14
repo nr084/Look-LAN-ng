@@ -28,13 +28,12 @@ Open the DMG and drag the app to Applications. macOS 13 is the deployment baseli
 
 ## Assets / Поставка
 
-The DMG is the app package; the ZIP contains optional raw diagnostic binaries and automated logs. UPX 5.2.1 disables macOS packing, so Mach-O is preserved and DMG uses ULMO/LZMA. No cloud, accounts or telemetry.
+The DMG is the app package. UPX 5.2.1 disables macOS packing, so Mach-O is preserved and DMG uses ULMO/LZMA. No cloud, accounts or telemetry.
 
 ## SHA-256
 
 | File | SHA-256 |
 | --- | --- |
 | `look@lan-ng-macos-universal-1.3.1.dmg` | `824493f5b2aee7572d44754019a9a8cadf239959464b17c491ba63f063517f34` |
-| `look@lan-ng-macos-diagnostics-1.3.1.zip` | `63067b5c2fbcb00ee6269ea440f69e1704a8169ea5f5c48ba7ba4ea0b4fe40d9` |
 
 © nr084, 2026 — copyright year generated during this build.
