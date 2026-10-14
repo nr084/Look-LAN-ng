@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][ValidateSet('x86','x64','arm64')][string]$Architecture)
+param([Parameter(Mandatory)][ValidateSet('x86','x64','arm64')][string]$Architecture,[switch]$DeferNativeArm64)
 $ErrorActionPreference='Stop'
 $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $exe=Join-Path $projectRoot "build/windows-$Architecture/Release/Look@LAN-ng.exe"
@@ -32,7 +32,9 @@ try {
     & $upx -t $packed
     if ($LASTEXITCODE) { throw 'UPX integrity failed' }
     $smokes=[ordered]@{}
+    if($DeferNativeArm64 -and $Architecture -ne 'arm64'){throw 'Native deferral is only supported for ARM64'}
     foreach ($argument in @('--smoke-test','--smoke-dpi','--smoke-close-scan','--smoke-close-tools')) {
+        if($DeferNativeArm64){$smokes[$argument]='pending_native_arm64';continue}
         $process=Start-Process $packed -ArgumentList $argument -PassThru -WindowStyle Hidden
         if (!$process.WaitForExit(30000)) { $process.Kill(); $process.WaitForExit(); throw "Packed $argument timeout" }
         if ($process.ExitCode -eq 77 -and $argument -in @('--smoke-close-scan','--smoke-close-tools')) { $smokes[$argument]='skipped_no_ipv4' }

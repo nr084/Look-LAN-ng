@@ -3,6 +3,7 @@
 #include "win_resolver.h"
 #include <ws2tcpip.h>
 #include <windns.h>
+#include "win_sdk_compat.h"
 #include <stdio.h>
 #include <wchar.h>
 #define CHECK(x) do { if (!(x)) { fprintf(stderr,"Resolver check failed, line %d: %s\n",__LINE__,#x); return 1; } } while (0)

@@ -14,8 +14,8 @@ typedef struct {
     ULONG InterfaceIndex;
     PDNS_QUERY_COMPLETION_ROUTINE pQueryCompletionCallback;
     PVOID pQueryContext;
-} DNS_QUERY_REQUEST;
-typedef struct DECLSPEC_ALIGN(8) { CHAR Reserved[32]; } DNS_QUERY_CANCEL;
+} DNS_QUERY_REQUEST, *PDNS_QUERY_REQUEST;
+typedef struct DECLSPEC_ALIGN(8) { CHAR Reserved[32]; } DNS_QUERY_CANCEL, *PDNS_QUERY_CANCEL;
 DNS_STATUS WINAPI DnsQueryEx(DNS_QUERY_REQUEST *,DNS_QUERY_RESULT *,DNS_QUERY_CANCEL *);
 DNS_STATUS WINAPI DnsCancelQuery(DNS_QUERY_CANCEL *);
 _Static_assert(sizeof(DNS_QUERY_CANCEL)==32,"DNS cancellation ABI");

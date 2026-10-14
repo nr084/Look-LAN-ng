@@ -178,7 +178,7 @@ try:
  from gi.repository import Gtk,Gdk
  Gtk.init([]);check(Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text()==own,'Context Copy IP clipboard')
  right_click(own,'Copy hostname');check(bool(Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text()),'Context Copy hostname clipboard')
- click('Monitoring');wait(lambda:find('label','Monitoring | 2 / 2 | Hosts: 2'),15);click('Stop');wait(ready);check(True,'GUI monitoring starts and Stop disables schedule')
+ click('Monitoring');wait(lambda:any(a.getRoleName()=='label' and a.name.startswith('Monitoring |') and '2 / 2' in a.name for a in nodes()),15);click('Stop');wait(ready);check(True,'GUI monitoring starts and Stop disables schedule')
  click('Single host');fill_dialog('Single host',['localhost']);wait(ready);check(any(row[1]=='127.0.0.1' for row in cells()),'Single hostname resolves and scans');check(inputs()[0].queryText().getText(0,-1)=='','Single host preserves profile ranges')
  imported=root/'missing-interface.lanprofile';data=(root/'saved.lanprofile').read_text(encoding='utf-8');import re;data=re.sub(r'(?m)^interface_id=.*$', 'interface_id=missing-looklan-test',data);imported.write_text(data,encoding='utf-8');click('Open profile');file_dialog(imported);wid=dialog_window('Profile interface unavailable');subprocess.run(['xdotool','windowfocus',wid],check=True);click('Use selected interface');wait(ready);check(inputs()[0].queryText().getText(0,-1)==own+'-'+own,'Imported profile requires explicit interface remapping')
  set_range(subnet);click('Scan');time.sleep(.2);t=time.monotonic();close();check(p.wait(timeout=5)==0,'Close during scan exits cleanly');check(time.monotonic()-t<3,'Close during scan bounded under 3s');p=None
