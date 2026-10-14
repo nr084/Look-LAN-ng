@@ -22,10 +22,6 @@ Native evidence on Ubuntu 26.04.1 x64 VM: six C suites, 39 GTK workflows, ARP-on
 
 Windows stable 1.2.0 remains in its existing release. The new macOS universal candidate remains local pending native user validation. This release includes the tested Linux ZIP only.
 
-## Screenshot / Скриншот
-
-![Linux 1.3.0: actual subnet scan](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/linux-1.3.0.png)
-
 ## SHA-256
 
 - `look@lan-ng-linux-x64-1.3.0.zip`: `743a896be8fe06118c0ec1ff4cf48ea492f14d19b2395003117f8b47523c5fc2`

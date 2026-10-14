@@ -74,6 +74,8 @@ installed system applications. mDNS, active IPv6 and disk history remain future 
 Окончательные сборки 1.3.2 после реального LAN-сканирования, без демонстрационных
 данных. / Final 1.3.2 builds after actual LAN scans, without sample data.
 
+IP-адреса на скриншотах скрыты размытием. / IP addresses in screenshots are blurred.
+
 **Windows, RU**
 
 ![Look@LAN-ng 1.3.2 on Windows](docs/images/windows-1.3.2.png)

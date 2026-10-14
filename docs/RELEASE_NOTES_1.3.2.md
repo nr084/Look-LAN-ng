@@ -48,15 +48,15 @@ Intel Mac hardware remain unverified. Device notes/history are session-only.
 
 ## Actual screenshots / Реальные скриншоты
 
-Final builds after real LAN scans, not sample data.
+Final builds after real LAN scans, not sample data. IP addresses are blurred for privacy. / IP-адреса скрыты размытием.
 
-![Windows 1.3.2 RU](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/windows-1.3.2.png)
+![Windows 1.3.2 RU](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/windows-1.3.2.png?privacy=20261014)
 
-![Ubuntu 1.3.2 EN](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/linux-1.3.2.png)
+![Ubuntu 1.3.2 EN](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/linux-1.3.2.png?privacy=20261014)
 
-![macOS 1.3.2 RU](https://raw.githubusercontent.com/nr084/Look-LAN-ng/v1.3.2/docs/images/macos-1.3.2-ru.png)
+![macOS 1.3.2 RU](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/macos-1.3.2-ru.png?privacy=20261014)
 
-[Mac English screenshot](https://raw.githubusercontent.com/nr084/Look-LAN-ng/v1.3.2/docs/images/macos-1.3.2-en.png)
+[Mac English screenshot](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/macos-1.3.2-en.png?privacy=20261014)
 
 ## SHA-256
 

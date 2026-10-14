@@ -26,12 +26,6 @@ Built and tested locally on macOS 27.0.1 / Apple Silicon: six arm64 and six Rose
 
 Open the DMG and drag the app to Applications. macOS 13 is the deployment baseline; older macOS and Intel hardware were not tested, and Rosetta is not an Intel-machine test. Ad-hoc signed, without Developer ID/notarization. Full NIC/DPI/long-runtime validation is not claimed complete. [Detailed evidence](https://github.com/nr084/Look-LAN-ng/blob/v1.3.1/docs/MACOS_VALIDATION.md).
 
-## Actual screenshots / Реальные скриншоты
-
-![macOS 1.3.1 RU](https://raw.githubusercontent.com/nr084/Look-LAN-ng/v1.3.1/docs/images/macos-1.3.1-ru.png)
-
-![macOS 1.3.1 EN](https://raw.githubusercontent.com/nr084/Look-LAN-ng/v1.3.1/docs/images/macos-1.3.1-en.png)
-
 ## Assets / Поставка
 
 The DMG is the app package; the ZIP contains optional raw diagnostic binaries and automated logs. UPX 5.2.1 disables macOS packing, so Mach-O is preserved and DMG uses ULMO/LZMA. No cloud, accounts or telemetry.

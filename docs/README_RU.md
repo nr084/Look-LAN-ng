@@ -61,9 +61,8 @@ Stop прекращает ожидание рабочих потоков ARP/ICM
 
 Активное сканирование IPv4; optional IPv6 neighbor display и future mDNS отсутствуют. Порты определяются по TCP connect, OS — вероятностная подсказка. Runtime не обращается к облаку; обновление vendor database и UPX выполняется только разработчиком. История/заметки устройства не сохраняются на диск.
 
-![Интерфейс с явно отмеченными демонстрационными данными](images/ui-preview.png)
 
-Это native preview с sample data, без сетевого сканирования. Оригинальный значок хранится в SVG и multi-resolution ICO; генератор: `tools/generate-icons.ps1`.
+Актуальные скриншоты Windows, Ubuntu и macOS доступны в [главном README](../README.md). IP-адреса скрыты размытием. Оригинальный значок хранится в SVG и multi-resolution ICO; генератор: `tools/generate-icons.ps1`.
 
 EXE сжат stable UPX 5.2.1 с `--ultra-brute --lzma`, проверен через `upx -t` и smoke-тест запуска. Начиная с v0.3 GUARD_CF убран по прямому указанию пользователя для совместимости с UPX; ASLR и NX сохранены. Политика будущих поставок и точные размеры/hash — в [docs/RELEASES.md](RELEASES.md) и `dist/release-info.json`.
 
