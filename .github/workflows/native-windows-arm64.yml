@@ -18,24 +18,26 @@ jobs:
       - name: Run prebuilt binaries (no compilation)
         shell: pwsh
         env:
-          GH_TOKEN: ${{ github.token }}
+          ARCHIVE_URL: ${{ secrets.LOOKLAN_NATIVE_ARM64_ARCHIVE }}
           ASSET_ID: ${{ inputs.asset_id }}
           ARCHIVE_SHA256: ${{ inputs.sha256 }}
         run: |
           $ErrorActionPreference='Stop'
           if([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -ne 'Arm64'){throw 'Native ARM64 OS required'}
           if($env:ASSET_ID -notmatch '^\d+$' -or $env:ARCHIVE_SHA256 -notmatch '^[a-f0-9]{64}$'){throw 'Invalid input'}
-          $headers=@{Authorization="Bearer $env:GH_TOKEN";Accept='application/octet-stream'}
-          Invoke-WebRequest "https://api.github.com/repos/${{ github.repository }}/releases/assets/$env:ASSET_ID" -Headers $headers -OutFile native.zip
+          $archiveUri=[Uri]$env:ARCHIVE_URL
+          if($archiveUri.Scheme -ne 'https' -or $archiveUri.Host -notin @('release-assets.githubusercontent.com','objects.githubusercontent.com')){throw 'GitHub file download URL required'}
+          Invoke-WebRequest $archiveUri -OutFile native.zip
+          Remove-Item Env:ARCHIVE_URL
           if((Get-FileHash native.zip).Hash.ToLowerInvariant() -ne $env:ARCHIVE_SHA256){throw 'Archive digest mismatch'}
           Expand-Archive native.zip native
           Set-Location native
           $proof=Get-Content checks.json -Raw | ConvertFrom-Json
           $results=[ordered]@{os=[Environment]::OSVersion.VersionString;architecture='ARM64';exe_sha256=$proof.exe_sha256;tests=[ordered]@{}}
           foreach($name in $proof.tests){
-            $args=@{FilePath=(Join-Path $pwd $name);RedirectStandardOutput="$name.log";RedirectStandardError="$name.err";PassThru=$true;WindowStyle='Hidden'}
-            if($name -eq 'files_tests.exe'){$args.ArgumentList=@($pwd.Path)}
-            $p=Start-Process @args
+            $looklanProcessArgs=@{FilePath=(Join-Path $pwd $name);RedirectStandardOutput="$name.log";RedirectStandardError="$name.err";PassThru=$true;WindowStyle='Hidden'}
+            if($name -eq 'files_tests.exe'){$looklanProcessArgs.ArgumentList=@($pwd.Path)}
+            $p=Start-Process @looklanProcessArgs
             if(!$p.WaitForExit(60000)){$p.Kill();throw "Timeout $name"}
             if($p.ExitCode -ne 0){throw "$name failed: $($p.ExitCode)"}
             $results.tests[$name]='passed'
