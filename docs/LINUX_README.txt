@@ -1,4 +1,4 @@
-Look@LAN-ng 1.3.0 — Linux x64
+Look@LAN-ng 1.3.2 — Linux x64
 © nr084, build year / год сборки
 
 Русский
@@ -41,9 +41,9 @@ Monitoring uses gentler pacing and does not repeat configured service scans.
 Full port ranges are selected manually. Cached neighbors do not prove ONLINE.
 Non-ASCII OEM NetBIOS names remain unknown. mDNS/active IPv6 are future work.
 
-Native testing: Ubuntu 26.04.1 x64 VM, ordinary user, C suites and 39 GTK
-workflows, packed startup/integrity, 100 Scan/Stop cycles and 120 scheduled
-monitoring rounds (~10 minutes), ARP-only and stale-cache fixtures. Ubuntu
+1.3.2 native testing: Ubuntu 26.04.1 x64 VM, ordinary user, C suites and 39 GTK
+workflows, packed startup/integrity and 100 Scan/Stop cycles. Historical 1.3.0: 120 scheduled
+monitoring rounds (~10 minutes), ARP-only and stale-cache fixtures; not repeated for 1.3.2. Ubuntu
 22.04 is a build baseline, not a verified runtime. Physical HiDPI/NIC unplug
 are untested. External SSH/URI actions require configured system applications.
 Source and validation: https://github.com/nr084/Look-LAN-ng

@@ -1,64 +1,111 @@
 # Look@LAN-ng
 
-**RU:** Компактный сетевой сканер с native интерфейсом, русским и английским языками. Windows, Linux и macOS — без облака, аккаунтов и telemetry.
+**RU:** Компактный LAN-сканер и монитор сети для Windows, Ubuntu/Linux и macOS.
+Native интерфейс, русский и английский языки. Без облака, аккаунтов, telemetry,
+драйверов и фоновых служб.
 
-**EN:** A compact network scanner with native Russian/English interfaces for Windows, Linux and macOS. No cloud, accounts or telemetry.
+**EN:** A compact LAN scanner and network monitor for Windows, Ubuntu/Linux and
+macOS. Native Russian/English interfaces. No cloud, accounts, telemetry, drivers
+or background services.
 
-[Releases / Релизы](https://github.com/nr084/Look-LAN-ng/releases) · [Specification / ТЗ](docs/SPECIFICATION.md) · [Build](BUILD.md) · [Project state](PROJECT_STATE.md)
+[Release 1.3.2](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.2) ·
+[Build](BUILD.md) · [Specification / ТЗ](docs/SPECIFICATION.md) ·
+[Implementation status](docs/SPEC_STATUS.md)
 
 ## Скачать / Download
 
-| Платформа / Platform | Проверенный релиз / Verified release | Поставка / Package |
+| Платформа / Platform | Архитектура / Architecture | Файл / File |
 | --- | --- | --- |
-| macOS universal arm64 + x86_64 | [1.3.2](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.2) | DMG |
-| Linux x64 | [1.3.0](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.0) | ZIP |
-| Windows x86 / x64 / ARM64 | [1.2.0](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.2.0) | One EXE per architecture ZIP |
+| Windows | x86 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-x86-1.3.2.zip) |
+| Windows | x64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-x64-1.3.2.zip) |
+| Windows | ARM64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-arm64-1.3.2.zip) |
+| Ubuntu/Linux | x64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-linux-x64-1.3.2.zip) |
+| macOS | Universal Intel + Apple Silicon | [DMG](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-macos-universal-1.3.2.dmg) |
 
-Текущий релиз **1.3.2 содержит только macOS**. Windows/Linux история сохранена; новые непроверенные кандидаты не опубликованы.
+**Windows:** распакуйте один EXE своей архитектуры и запустите его. Установка и
+права администратора не нужны. / Extract the single EXE for your architecture
+and run it; no installer or administrator rights required.
 
-The current **1.3.2 release contains macOS only**. Existing Windows/Linux releases are preserved; unvalidated development candidates are not published.
+**Ubuntu/Linux:** распакуйте ZIP и запустите `./LookLAN.sh`. Нужны графическая
+сессия и системные GTK 3 libraries. Ubuntu 22.04+ — цель сборки; native-проверки
+выполнены на Ubuntu 26.04.1 x64. / Extract and run `./LookLAN.sh` with system
+GTK 3 libraries. Ubuntu 22.04+ is the build baseline; runtime checks used 26.04.1.
 
-## macOS
+**macOS:** откройте DMG и перенесите приложение в Applications. Цель сборки —
+macOS 13+, подпись ad-hoc, без notarization. / Open the DMG and drag the app to
+Applications. macOS 13+ deployment baseline; ad-hoc signed, not notarized.
 
-**RU:** Откройте DMG и перенесите Look@LAN-ng в Applications. Выберите сетевой интерфейс и нажмите «Сканировать». «Стоп» отменяет операцию; результаты появляются постепенно. Язык: «Язык системы» / English / Русский, явный выбор сохраняется. Нативная сборка universal; deployment baseline macOS 13. Приложение подписано ad-hoc, без Developer ID/notarization.
+Выберите сетевой интерфейс → **Сканировать**. Результаты появляются постепенно;
+**Стоп** отменяет работу. / Select an interface → **Scan**. Hosts appear
+progressively; **Stop** cancels work.
 
-**EN:** Open the DMG and drag Look@LAN-ng to Applications. Select a network interface and click Scan. Stop cancels work; results appear progressively. Language: System language / English / Русский; an explicit selection is saved. Native universal build, macOS 13 deployment baseline. The app is ad-hoc signed, without Developer ID/notarization.
-
-Проверено на macOS 27.0.1 / Apple Silicon: 6/6 arm64 suites, 6/6 Rosetta x86_64 suites, оба final smoke modes, Cocoa GUI и реальное LAN-сканирование. 120 раундов мониторинга (~10 минут): FD 3 → 3, RSS 11664 → max 11696 KiB. Intel hardware и старые macOS не проверены. [Подробные результаты и ограничения](docs/MACOS_VALIDATION.md).
-
-Verified on macOS 27.0.1 / Apple Silicon: six arm64 and six Rosetta x86_64 suites, both final smoke modes, Cocoa GUI and actual LAN discovery. A 120-round monitoring check (~10 minutes) kept FD at 3, RSS 11664 → max 11696 KiB. Intel hardware and older macOS were not tested. [Evidence and limitations](docs/MACOS_VALIDATION.md).
+Язык по умолчанию: русская система → русский, остальные → английский.
+System / English / Русский можно выбрать вручную; выбор сохраняется.
+/ Russian system locale defaults to Russian; all others to English. A saved
+System / English / Русский override is available.
 
 ## Возможности / Features
 
-- IPv4 discovery through ARP, ICMP and TCP with the selected source/interface; reverse DNS and NetBIOS fallback, MAC and embedded vendor database.
-- Common/custom TCP ports, Single Host, sorting/filtering, cautious device/OS hints.
-- Automatic monitoring with ONLINE/OFFLINE/NEW/CHANGED/UNKNOWN, bounded session history/log, statistics, separate Ping and Trace.
-- Device notes, UTF-8 profiles and background CSV/TXT/HTML export with immutable snapshots and atomic file replacement.
-- Native Win32 / GTK3 / Cocoa; C17 core has no Windows headers. No driver, background service or embedded remote client.
+- ARP, ICMP и TCP discovery с выбранного интерфейса; асинхронные DNS/NetBIOS,
+  MAC и встроенная база производителей. / Selected-interface discovery,
+  asynchronous naming, MAC and embedded vendor lookup.
+- Один узел, common/custom TCP-порты, сортировка, фильтр и подсказки ОС.
+  / Single Host, common/custom TCP ports, sorting, filtering and cautious OS hints.
+- Мониторинг ONLINE/OFFLINE/NEW/CHANGED/UNKNOWN, ограниченный журнал и история,
+  статистика, Ping/Trace и заметки устройства. / Monitoring, bounded session
+  logs/history, statistics, Ping/Trace and device notes.
+- UTF-8 профили, фоновый атомарный CSV/TXT/HTML export.
+  / UTF-8 profiles and background atomic CSV/TXT/HTML export.
+- Native Win32 / GTK3 / Cocoa; переносимое C17 core. Все сборки локальные:
+  Windows/Linux на Windows, macOS на Mac. GitHub Actions только запускает
+  готовые ARM64 файлы; не компилирует. / Local compilation, with runtime-only
+  ARM64 verification on GitHub.
 
-ARP cache alone does not prove ONLINE; OS hints are probabilistic. Device notes/history are session-only; profile notes persist. External Web/SSH/SMB/RDP actions use installed system applications. Active IPv6, future mDNS and disk history are outside the current scope.
+ARP-кэш сам по себе не доказывает ONLINE; определение ОС вероятностное.
+Заметки и история устройств — текущей сессии, заметки профиля сохраняются.
+Web/SSH/SMB/RDP используют установленные системные приложения. mDNS, активное
+IPv6-сканирование и история на диске остаются будущими функциями.
+/ Cached neighbors do not prove ONLINE; OS hints are probabilistic. Device
+notes/history are session-only, profile notes persist. External actions use
+installed system applications. mDNS, active IPv6 and disk history remain future work.
 
 ## Реальные скриншоты / Actual screenshots
 
-macOS 1.3.2, русский интерфейс, итоговая сборка / Russian UI, final build:
+Окончательные сборки 1.3.2 после реального LAN-сканирования, без демонстрационных
+данных. / Final 1.3.2 builds after actual LAN scans, without sample data.
 
-![macOS 1.3.2 RU](docs/images/macos-1.3.2-ru.png)
+**Windows, RU**
 
-macOS 1.3.2, English UI, final build:
+![Look@LAN-ng 1.3.2 on Windows](docs/images/windows-1.3.2.png)
 
-![macOS 1.3.2 EN](docs/images/macos-1.3.2-en.png)
+**Ubuntu, EN**
 
-[Windows 1.2.0 screenshot](docs/images/windows-1.2.0.png) · [Linux 1.3.0 screenshot](docs/images/linux-1.3.0.png)
+![Look@LAN-ng 1.3.2 on Ubuntu](docs/images/linux-1.3.2.png)
 
-## Development
+**macOS, RU**
 
-macOS compilation, packaging and testing run locally on Mac. This workspace builds **macOS only**. Windows/Linux compilation stays local on Windows. GitHub Actions does not compile.
+![Look@LAN-ng 1.3.2 on macOS](docs/images/macos-1.3.2-ru.png)
 
-```sh
-./tools/build-macos.sh
-python3 tools/package-macos.py --release
-```
+[macOS English screenshot](docs/images/macos-1.3.2-en.png)
 
-[BUILD.md](BUILD.md) documents dependencies, tests and checked publication. [Windows validation](docs/RELEASE_CHECK.md) and [Linux validation](docs/LINUX_VALIDATION.md) describe their release-specific results. Full OS/NIC/physical DPI/long-load matrices are not claimed complete.
+## Проверки и ограничения / Validation and limits
 
-© nr084, build year / год сборки. Copyright year is generated during compilation.
+Windows x86/x64: по 15 CTest и четыре packed smoke modes на Windows 11 x64.
+ARM64: 11 локально скомпилированных C suites и четыре packed smoke modes
+на нативном Windows 11 ARM64 [runner](https://github.com/nr084/Look-LAN-ng/actions/runs/38566307932).
+UPX 5.2.1, `--ultra-brute --lzma`, integrity и запуск проверены.
+
+Linux: шесть native C suites, 39 GTK workflows и packed startup на Ubuntu VM.
+100 Scan/Stop cycles: FD 6 → 6, максимальный Stop 12 ms. Ubuntu 22.04 runtime,
+physical HiDPI/NIC unplug и длительная матрица не проверены.
+
+macOS: native arm64 и Rosetta x86_64 suites, подписанный app smoke, Cocoa GUI,
+реальный LAN scan и DMG проверки на Apple Silicon. Intel hardware и старые
+macOS не проверены. UPX не поддерживает Mach-O; DMG сжат ULMO/LZMA.
+
+These checks cover the stated environments, not a complete Windows 10/11,
+physical DPI/NIC or long-runtime matrix. Rosetta results do not replace Intel
+hardware testing. See [Windows/Linux 1.3.2 validation](docs/WINDOWS_LINUX_VALIDATION_1.3.2.md)
+and [macOS validation](docs/MACOS_VALIDATION.md) for exact evidence and limits.
+
+© nr084 — год copyright вычисляется при сборке / copyright year generated at build time.

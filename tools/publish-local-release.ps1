@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$Version,[Parameter(Mandatory)][string]$NotesFile,[Parameter(Mandatory)][string[]]$Assets,[switch]$Prerelease)
+param([Parameter(Mandatory)][string]$Version,[Parameter(Mandatory)][string]$NotesFile,[Parameter(Mandatory)][string[]]$Assets,[switch]$Prerelease,[switch]$AddAssetsToPublishedRelease)
 $ErrorActionPreference='Stop'
 if($Version -notmatch '^\d+\.\d+\.\d+([-.][A-Za-z0-9.]+)?$'){throw 'Invalid release version'}
 $repository='nr084/Look-LAN-ng';$tag='v'+$Version
@@ -36,7 +36,7 @@ if($release.Count -gt 1){throw 'Ambiguous release tag'}
 if(!$release.Count){
     $body=@{tag_name=$tag;target_commitish=$commit;name="Look@LAN-ng $Version";body=$notes;draft=$true;prerelease=[bool]$Prerelease;make_latest='false'} | ConvertTo-Json
     $release=Invoke-RestMethod -Method Post "https://api.github.com/repos/$repository/releases" -Headers $headers -ContentType 'application/json; charset=utf-8' -Body ([Text.Encoding]::UTF8.GetBytes($body))
-}else{$release=$release[0];if(!$release.draft){throw 'Release already published; do not replace immutable assets'}}
+}else{$release=$release[0];if(!$release.draft -and !$AddAssetsToPublishedRelease){throw 'Release already published; use explicit add-only mode to add newly validated platform files'}}
 foreach($file in $files){
     $hash=(Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant();$existing=@($release.assets | Where-Object name -eq $file.Name)
     if($existing.Count){if($existing[0].digest -ne ('sha256:'+$hash)){throw 'Existing draft asset differs'};continue}

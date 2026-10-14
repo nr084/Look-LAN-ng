@@ -1,4 +1,4 @@
-param([string]$Executable='dist/1.2.0/x64/Look@LAN-ng.exe',[string]$Output='docs/images/windows-1.2.0.png')
+param([string]$Executable='dist/1.2.0/x64/Look@LAN-ng.exe',[string]$Output='docs/images/windows-1.2.0.png',[int]$Width=1600,[int]$Height=650)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Drawing.Common
 $looklanCode = @'
@@ -36,7 +36,7 @@ try {
  $looklanDeadline=[DateTime]::UtcNow.AddSeconds(10)
  while($looklanWindow -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $looklanDeadline){$looklanWindow=[LooklanCapture]::Find($looklanProcess.Id);Start-Sleep -Milliseconds 100}
  if($looklanWindow -eq [IntPtr]::Zero){throw 'Owned application window not found'}
- [LooklanCapture]::SetWindowPos($looklanWindow,[IntPtr]::Zero,40,40,1600,900,20) > $null
+ [LooklanCapture]::SetWindowPos($looklanWindow,[IntPtr]::Zero,40,40,$Width,$Height,20) > $null
  [LooklanCapture]::ShowWindow($looklanWindow,4) > $null
  [LooklanCapture]::SendMessage($looklanWindow,0x111,[IntPtr]101,[IntPtr]::Zero) > $null
  $looklanToolbar=[LooklanCapture]::FindWindowEx($looklanWindow,[IntPtr]::Zero,'ToolbarWindow32',$null)
@@ -44,6 +44,8 @@ try {
  Start-Sleep -Milliseconds 500
  while([LooklanCapture]::SendMessage($looklanToolbar,0x409,[IntPtr]101,[IntPtr]::Zero) -eq [IntPtr]::Zero){if([DateTime]::UtcNow -ge $looklanDeadline){throw 'Real scan timed out'};Start-Sleep -Milliseconds 250}
  Start-Sleep -Milliseconds 1500
+ $looklanList=[LooklanCapture]::FindWindowEx($looklanWindow,[IntPtr]::Zero,'SysListView32',$null)
+ if($looklanList -ne [IntPtr]::Zero){[LooklanCapture]::SendMessage($looklanList,0x100,[IntPtr]0x24,[IntPtr]::Zero) > $null;Start-Sleep -Milliseconds 200}
  [LooklanCapture]::Capture($looklanWindow,$looklanOutput)
  Write-Output $looklanOutput
 } finally {
