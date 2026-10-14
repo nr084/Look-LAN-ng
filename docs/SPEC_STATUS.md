@@ -1,3 +1,13 @@
+# Current multi-platform release — 1.3.2, 14 October 2026
+
+Windows x86/x64/ARM64, Linux x64 and macOS universal are available in the same 1.3.2 release. Mandatory implementation scope remains complete; optional mDNS, active IPv6 and disk history remain future scope. Windows/Linux were compiled locally on Windows, Mac independently on Mac. This Windows workspace does not build Mac.
+
+Windows x86/x64 passed 15 CTest each and four final packed smokes. Native ARM64 passed eleven locally compiled C suites and four packed smokes in a runtime-only job. Ubuntu 26.04.1 passed six native suites and 39 GTK workflows, with real final screenshots for Windows and Ubuntu. Mac's existing native evidence/assets/tag are preserved. Details and incomplete hardware/OS/NIC/DPI/long-runtime matrices: WINDOWS_LINUX_VALIDATION_1.3.2.md and MACOS_VALIDATION.md.
+
+The records below are historical and do not describe the current published platform versions.
+
+---
+
 # Current macOS release — 1.3.1, 13 October 2026
 
 macOS is built and tested locally on Mac; this workspace builds macOS only. Stable 1.3.1 universal includes the mandatory implemented functionality. Six arm64 and six Rosetta x86_64 suites, both signed-app smoke modes, native Cocoa workflows/real LAN scan and 120-round monitoring/resource checks passed. Exact hashes, evidence and unavailable Intel/older macOS/physical NIC/DPI/long-runtime checks are recorded in MACOS_VALIDATION.md. Passing the full Definition of Done matrix is not claimed. Windows 1.2.0 and Linux 1.3.0 release evidence remains separate.
