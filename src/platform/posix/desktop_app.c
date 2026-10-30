@@ -23,7 +23,10 @@ const char *desktop_tr(const desktop_app_t *a,const char *en,const char *ru){ret
 static bool ru_system(const char *language){return language && language[0]=='r' && language[1]=='u' && (language[2]=='_' || language[2]=='-' || language[2]==0);}
 void desktop_language(desktop_app_t *a,unsigned language,const char *system){
     a->language=language<=2 ? language : 0; a->russian=a->language==2 || (!a->language && ru_system(system));
-    if(a->persistent && a->settings[0]){FILE *f=fopen(a->settings,"w");if(f){fprintf(f,"%u\n",a->language);fclose(f);chmod(a->settings,0600);}}
+    if(a->persistent && a->settings[0] && !a->settings_blocked){
+        char temporary[4096];int n=snprintf(temporary,sizeof(temporary),"%s.XXXXXX",a->settings);
+        if(n>0 && (size_t)n<sizeof(temporary)){int fd=mkstemp(temporary);if(fd>=0){FILE *f=fdopen(fd,"w");bool ok=false;if(f){ok=fprintf(f,"%u\n%u\n",a->language,a->theme)>0;if(fflush(f) || fsync(fd))ok=false;if(fclose(f))ok=false;}else close(fd);if(!ok || rename(temporary,a->settings))unlink(temporary);}}
+    }
 }
 bool desktop_init(desktop_app_t *a,const char *system){
     memset(a,0,sizeof(*a));a->hosts=calloc(DESKTOP_HOSTS,sizeof(*a->hosts));a->log=calloc(10000,sizeof(*a->log));
@@ -33,12 +36,12 @@ bool desktop_init(desktop_app_t *a,const char *system){
     monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);profile_defaults(&a->profile);
     char base[4096]={0};
 #ifdef __APPLE__
-    const char *home=getenv("HOME");if(home)snprintf(base,sizeof(base),"%s/Library/Application Support/LookLAN-ng",home);
+    const char *override=getenv("LOOKLAN_DATA_DIR");const char *home=getenv("HOME");if(override && override[0]=='/')snprintf(base,sizeof(base),"%s",override);else if(home)snprintf(base,sizeof(base),"%s/Library/Application Support/LookLAN-ng",home);
 #else
     ssize_t length=readlink("/proc/self/exe",base,sizeof(base)-1);if(length>0){base[length]=0;char *slash=strrchr(base,'/');if(slash)*slash=0;}
 #endif
     if(base[0] && strlen(base)+32<sizeof(a->settings)){snprintf(a->settings,sizeof(a->settings),"%s/Look@LAN-ng.ini",base);snprintf(a->profiles_directory,sizeof(a->profiles_directory),"%s/profiles",base);}
-    FILE *f=a->settings[0] ? fopen(a->settings,"r") : NULL;unsigned language=0;if(f){if(fscanf(f,"%u",&language)!=1 || language>2)language=0;fclose(f);}
+    FILE *f=a->settings[0] ? fopen(a->settings,"r") : NULL;unsigned language=0;if(!f && a->settings[0] && errno!=ENOENT)a->settings_blocked=true;if(f){if(fscanf(f,"%u",&language)!=1 || language>2){language=0;a->settings_blocked=true;}unsigned theme=0;int read=fscanf(f,"%u",&theme);if(read==1 && theme<=2)a->theme=theme;else if(read!=EOF)a->settings_blocked=true;fclose(f);}
     a->auto_profile=true;
     a->language=language;a->russian=language==2 || (!language && ru_system(system));return desktop_refresh(a);
 }

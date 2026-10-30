@@ -36,3 +36,9 @@ ARM64 deferral is a local packaging step, not permission to publish untested fil
 Use `tools/publish-local-release.ps1` with the verified Windows ZIPs and Linux ZIP, matching native proof and RU/EN notes. Verify downloads, then remove earlier GitHub releases per the user's standing instruction; source Git history is not rewritten. A later Mac publication adds its verified DMG to the current release while preserving Windows/Linux artifacts and notes.
 
 Capture final real Windows/Ubuntu scans; blur every IP before committing screenshots. Remove obsolete screenshot files and temporary captures. Clean old local delivery packages only after the new packages and necessary diagnostics exist; never delete user settings/profiles/history.
+
+## Native macOS workspace
+
+On Mac, use `bash tools/build-macos.sh`: it checks official latest stable LLVM/Homebrew, downloads fresh IEEE MA-L, records versions/date/hashes, configures a fresh universal CMake cache and checks arm64+x86_64 slices. No Windows/Linux compilation is done on Mac. Run native CTest and Rosetta tests, validate Cocoa with an isolated `--validation-data-dir /absolute/test/path`, then package with `python3 tools/package-macos.py --release`. Keep the raw diagnostics local.
+
+Publish only the checked DMG using `tools/publish-macos-release.py --version 1.4.0 --source-repo <clean-checkout> --notes docs/RELEASE_NOTES_MACOS_1.4.0.md --add-assets-to-published-release`. This preserves the four Windows/Linux assets, their IDs/sizes/hashes and the existing tag; it replaces only the marked macOS notes block. Every screenshot must have all IP/MAC regions strongly blurred and checked before upload.

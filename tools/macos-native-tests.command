@@ -10,7 +10,7 @@ looklan_log="$looklan_dir/Native-tests.log"
     /usr/bin/sw_vers
     /usr/bin/uname -m
     looklan_result=0
-    for looklan_test in core_tests feature_tests monitor_tests profile_report_tests details_nbns_tests posix_runtime_tests; do
+    for looklan_test in history_tests history_store_tests profile_session_tests core_tests feature_tests monitor_tests profile_report_tests details_nbns_tests posix_runtime_tests; do
         printf '\n--- %s ---\n' "$looklan_test"
         env -u HOME "$looklan_dir/Native-validation/$looklan_test"
         looklan_status=$?

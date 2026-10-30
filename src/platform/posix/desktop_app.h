@@ -12,7 +12,7 @@
 typedef struct {
     posix_backend_t backend; posix_interface_t interfaces[POSIX_INTERFACES]; size_t interface_count,selected;
     lan_host_t *hosts;size_t host_count;monitor_event_t *log;monitor_t monitor;profile_t profile;
-    vendor_table_t vendors;details_store_t *details;bool russian,scanning,monitoring,closing,closed,failed;unsigned language;uint32_t completed,total;
+    vendor_table_t vendors;details_store_t *details;bool russian,scanning,monitoring,closing,closed,failed;unsigned language,theme;bool settings_blocked;uint32_t completed,total;
     uint64_t next_round;
     uint64_t scan_started_ms,scan_elapsed_ms,status_updated_ms;
     posix_tools_t *tools;bool tracing;ping_sample_t trace[30];size_t trace_count;uint32_t trace_ip,trace_interface;

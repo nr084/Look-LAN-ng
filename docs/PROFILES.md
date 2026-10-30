@@ -33,7 +33,7 @@ CSV/TXT/HTML экспорт содержит снимок всех записе�
 
 Разовый запуск и сканирование не создают INI/каталоги настроек. Успешное сохранение профиля активирует постоянный режим; открытие уже сохранённого профиля также восстанавливает этот режим. В profiles выбирается единственный корректный профиль v2; при нескольких автоматического выбора нет. Настройки UI сохраняются только в постоянном режиме. В Linux каталог profiles находится рядом с исполняемым файлом, в Mac — в Application Support/LookLAN-ng; macOS native validation выполняется отдельно на Mac.
 
-В Windows и Linux сохранение направляет выбранное имя файла в управляемую папку profiles. Старый формат v1 отклоняется без преобразования и перезаписи. Старые файлы автоматически не удаляются.
+В Windows, Linux и macOS сохранение направляет выбранное имя файла в управляемую папку profiles. Старый формат v1 отклоняется без преобразования и перезаписи. Старые файлы автоматически не удаляются.
 
 Temporary launches/scans do not create INI/settings directories. A successful save or opening an existing saved profile activates persistence. One valid v2 profile is selected on startup; multiple profiles require explicit selection. UI settings are written only in persistent mode. Device notes, Ping samples and the last Trace remain session-only. Profile notes remain in .lanprofile.
 

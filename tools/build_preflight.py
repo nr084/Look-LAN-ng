@@ -4,12 +4,9 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 TOOLS=ROOT/'build/toolchains'
 def fetch(url):
-    if os.name=='nt':
-        (ROOT/'build').mkdir(exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix='build-fetch-',dir=ROOT/'build') as folder:
-            path=Path(folder)/'download';download(url,path);return path.read_bytes()
-    request=urllib.request.Request(url,headers={'User-Agent':'LookLAN-ng-build-preflight','Cache-Control':'no-cache'})
-    with urllib.request.urlopen(request,timeout=120) as response:return response.read()
+    (ROOT/'build').mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='build-fetch-',dir=ROOT/'build') as folder:
+        path=Path(folder)/'download';download(url,path);return path.read_bytes()
 def download(url,path):
     if os.name=='nt':
         # Windows curl uses the OS Schannel certificate store, including local
@@ -17,8 +14,9 @@ def download(url,path):
         curl=Path(os.environ.get('SystemRoot','C:/Windows'))/'System32/curl.exe'
         subprocess.run([str(curl),'--fail','--location','--silent','--show-error','--connect-timeout','20','--max-time','90','--retry','2','--retry-delay','1','--user-agent','LookLAN-build-preflight','--header','Cache-Control: no-cache','--output',str(path),url],check=True,timeout=300)
     else:
-        import shutil
-        with urllib.request.urlopen(url,timeout=180) as response,path.open('wb') as out:shutil.copyfileobj(response,out)
+        # Bound total time as well as connection time; urllib can stall while
+        # slowly reading a response. curl retains full TLS verification.
+        subprocess.run(['curl','--fail','--location','--compressed','--silent','--show-error','--connect-timeout','15','--max-time','90','--retry','2','--retry-delay','1','--user-agent','LookLAN-build-preflight','--output',str(path),url],check=True,timeout=300)
 def latest(repo):
     r=json.loads(fetch('https://api.github.com/repos/'+repo+'/releases/latest'))
     if r['prerelease'] or r['draft']:raise RuntimeError('Stable compiler release required')
@@ -43,6 +41,7 @@ def install(release,pattern,folder):
     stamp.write_text(json.dumps({'digest':asset['digest'],'compiler':compiler.relative_to(target).as_posix(),'compiler_sha256':hashlib.sha256(compiler.read_bytes()).hexdigest()},indent=2)+'\n')
     archive.unlink();return compiler
 def refresh_vendor():
+    print('Refreshing official IEEE MA-L database...',flush=True)
     data=fetch('https://standards-oui.ieee.org/oui/oui.csv')
     vendors={int(r['Assignment'],16):r['Organization Name'].strip() for r in csv.DictReader(io.StringIO(data.decode('utf-8-sig'))) if r['Registry']=='MA-L' and re.fullmatch('[0-9A-Fa-f]{6}',r['Assignment'])}
     if len(vendors)<30000:raise RuntimeError('Incomplete official IEEE database')
@@ -84,7 +83,7 @@ def prepare_mac():
     compiler=Path(subprocess.check_output(['brew','--prefix','llvm'],text=True).strip())/'bin/clang'
     actual=subprocess.check_output([str(compiler),'--version'],text=True)
     if not re.search(r'clang version '+re.escape(version)+r'\b',actual):raise RuntimeError('Native compiler does not match latest LLVM stable')
-    vendor=refresh_vendor();report={'target':'macos','compiler':str(compiler),'llvm_stable':version,'compiler_version':actual,'vendor':vendor}
+    vendor=refresh_vendor();report={'checked_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'target':'macos','compiler':str(compiler),'compiler_source':release['html_url'],'compiler_sha256':hashlib.sha256(compiler.read_bytes()).hexdigest(),'llvm_stable':version,'compiler_version':actual,'vendor':vendor}
     path=ROOT/'build/validation/build-preflight-macos.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(report,indent=2)+'\n')
     print('PASS: native latest stable compiler and fresh IEEE database');return compiler
 if __name__=='__main__':

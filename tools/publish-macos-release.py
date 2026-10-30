@@ -58,7 +58,14 @@ def main():
     existing = next((r for r in listing if r['tag_name'] == tag), None)
     if existing and not existing['draft'] and not args.add_assets_to_published_release:
         raise SystemExit('Use explicit add-assets mode for a published Windows/Linux release')
-    preserved={a['name']:a.get('digest') for a in existing['assets']} if existing else {}
+    if args.add_assets_to_published_release:
+        if not existing or existing['draft'] or existing['prerelease']:
+            raise SystemExit('Add-assets mode requires the existing stable release')
+        required={f'look@lan-ng-{arch}-{args.version}.zip' for arch in ['x86','x64','arm64','linux-x64']}
+        if not required.issubset({a['name'] for a in existing['assets']}):
+            raise SystemExit('Four published Windows/Linux ZIPs must be present')
+    tag_before=run('gh','api',f'repos/{REPOSITORY}/git/ref/tags/{tag}','--jq','.object.sha') if args.add_assets_to_published_release else None
+    preserved={a['name']:{k:a.get(k) for k in ['id','size','digest']} for a in existing['assets']} if existing else {}
     notes=args.notes.read_text()
     if existing and not existing['draft']:
         previous=existing.get('body') or ''
@@ -79,7 +86,7 @@ def main():
     if {a['name'] for a in release['assets']} != set(preserved) | {f.name for f in assets}:
         raise SystemExit('Unexpected draft assets')
     for name,value in preserved.items():
-        if next(a for a in release['assets'] if a['name']==name).get('digest')!=value:
+        if {k:next(a for a in release['assets'] if a['name']==name).get(k) for k in ['id','size','digest']}!=value:
             raise SystemExit('Existing platform asset changed')
     for file in assets:
         found = next(a for a in release['assets'] if a['name'] == file.name)
@@ -95,6 +102,8 @@ def main():
     final = release_by_tag(tag)
     if final['draft'] or final['prerelease']:
         raise SystemExit('Release did not publish as stable')
+    if tag_before and run('gh','api',f'repos/{REPOSITORY}/git/ref/tags/{tag}','--jq','.object.sha')!=tag_before:
+        raise SystemExit('Published source tag changed')
     print(final['html_url'])
 
 if __name__ == '__main__':

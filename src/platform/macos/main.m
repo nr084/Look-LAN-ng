@@ -24,13 +24,20 @@ static NSString *text(const char *s){return [NSString stringWithUTF8String:s] ?:
 @property NSMutableArray<NSNumber *> *visible;
 @property NSTimer *timer;
 @property NSString *systemLanguage;
-@property BOOL terminating;
+@property BOOL terminating,persistenceConfigured;
 @property BOOL rowsDirty;
 @property NSTimeInterval nextRowsRefresh;
 @end
 static desktop_app_t app;
 @implementation LANDelegate
 - (NSString *)tr:(const char *)en ru:(const char *)ru{return text(desktop_tr(&app,en,ru));}
+- (void)appearanceChanged:(NSNotification *)note{(void)note;BOOL contrast=NSWorkspace.sharedWorkspace.accessibilityDisplayShouldIncreaseContrast;NSApp.appearance=contrast || app.theme==0 ? nil:[NSAppearance appearanceNamed:app.theme==1 ? NSAppearanceNameAqua:NSAppearanceNameDarkAqua];}
+- (void)theme:(NSMenuItem *)sender{app.theme=(unsigned)sender.tag;desktop_language(&app,app.language,self.systemLanguage.UTF8String);[self appearanceChanged:nil];[self menu];}
+- (void)configurePersistence {
+    if(!app.persistent || self.persistenceConfigured)return;self.persistenceConfigured=YES;
+    if(!getenv("LOOKLAN_DATA_DIR")){[self.window setFrameAutosaveName:@"LookLAN-main"];self.table.autosaveTableColumns=YES;self.networkSplit.autosaveName=@"LookLAN-network-split-v2";self.hostSplit.autosaveName=@"LookLAN-details-split-v2";}
+    [self appearanceChanged:nil];[self layoutTopControls];
+}
 - (void)menu {
     NSMenu *bar=[NSMenu new];NSMenuItem *application=[NSMenuItem new];[bar addItem:application];
     NSMenu *applicationMenu=[[NSMenu alloc]initWithTitle:@"Look@LAN-ng"];application.submenu=applicationMenu;
@@ -48,6 +55,10 @@ static desktop_app_t app;
     NSMenuItem *tools=[NSMenuItem new];[bar addItem:tools];NSMenu *actions=[[NSMenu alloc]initWithTitle:[self tr:"Tools" ru:"Инструменты"]];tools.submenu=actions;
     NSArray *actionNames=@[[self tr:"Single host…" ru:"Один узел…"],[self tr:"Monitoring" ru:"Мониторинг"],[self tr:"Statistics" ru:"Статистика"],[self tr:"History" ru:"История"],[self tr:"Notes…" ru:"Заметки…"]];NSArray *selectors=@[@"single:",@"monitoring:",@"statistics:",@"history:",@"notes:"];
     for(NSUInteger i=0;i<actionNames.count;++i){NSMenuItem *item=[actions addItemWithTitle:actionNames[i] action:NSSelectorFromString(selectors[i]) keyEquivalent:@""];item.target=self;}
+    NSMenuItem *view=[NSMenuItem new];[bar addItem:view];NSMenu *views=[[NSMenu alloc]initWithTitle:[self tr:"View" ru:"Вид"]];view.submenu=views;
+    NSMenuItem *theme=[NSMenuItem new];[views addItem:theme];theme.title=[self tr:"Theme" ru:"Тема"];NSMenu *themes=[[NSMenu alloc]initWithTitle:theme.title];theme.submenu=themes;
+    NSArray *themeNames=@[[self tr:"System" ru:"Системная"],[self tr:"Light" ru:"Светлая"],[self tr:"Dark" ru:"Тёмная"]];
+    for(NSUInteger i=0;i<3;++i){NSMenuItem *item=[themes addItemWithTitle:themeNames[i] action:@selector(theme:) keyEquivalent:@""];item.target=self;item.tag=(NSInteger)i;item.state=app.theme==i ? NSControlStateValueOn:NSControlStateValueOff;}
     NSMenuItem *language=[NSMenuItem new];[bar addItem:language];NSMenu *languages=[[NSMenu alloc]initWithTitle:[self tr:"Language" ru:"Язык"]];language.submenu=languages;
     NSArray *names=@[[self tr:"System language" ru:"Язык системы"],@"English",@"Русский"];
     for(NSUInteger i=0;i<3;++i){NSMenuItem *item=[languages addItemWithTitle:names[i] action:@selector(language:) keyEquivalent:@""];item.tag=(NSInteger)i;item.target=self;item.state=app.language==i ? NSControlStateValueOn : NSControlStateValueOff;}
@@ -57,7 +68,7 @@ static desktop_app_t app;
     (void)notification;self.systemLanguage=NSLocale.preferredLanguages.firstObject ?: @"en";
     if(!desktop_init(&app,self.systemLanguage.UTF8String))exit(EXIT_FAILURE);
     self.window=[[NSWindow alloc]initWithContentRect:NSMakeRect(0,0,1120,720) styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable|NSWindowStyleMaskResizable backing:NSBackingStoreBuffered defer:NO];
-    self.window.title=@"Look@LAN-ng " @APP_VERSION;self.window.minSize=NSMakeSize(900,560);self.window.delegate=self;[self.window center];[self.window setFrameAutosaveName:@"LookLAN-main"];
+    self.window.title=@"Look@LAN-ng " @APP_VERSION;self.window.minSize=NSMakeSize(900,560);self.window.delegate=self;[self.window center];self.window.restorable=NO;
     NSView *content=self.window.contentView;
     self.interfaces=[[NSPopUpButton alloc]initWithFrame:NSMakeRect(14,674,310,28) pullsDown:NO];self.interfaces.target=self;self.interfaces.action=@selector(selectInterface:);self.interfaces.autoresizingMask=NSViewMinYMargin;
     self.range=[[NSTextField alloc]initWithFrame:NSMakeRect(334,674,310,28)];self.range.autoresizingMask=NSViewMinYMargin;
@@ -66,7 +77,7 @@ static desktop_app_t app;
     [content addSubview:self.interfaces];[content addSubview:self.range];[content addSubview:self.filter];
     self.networkInfo=[NSTextField labelWithString:@""];self.networkInfo.frame=NSMakeRect(14,644,1092,22);self.networkInfo.autoresizingMask=NSViewMinYMargin|NSViewWidthSizable;self.networkInfo.lineBreakMode=NSLineBreakByTruncatingTail;[content addSubview:self.networkInfo];
     NSScrollView *scroll=[[NSScrollView alloc]initWithFrame:NSMakeRect(240,202,866,432)];scroll.hasVerticalScroller=YES;scroll.hasHorizontalScroller=YES;scroll.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
-    self.table=[[NSTableView alloc]initWithFrame:scroll.bounds];self.table.dataSource=self;self.table.delegate=self;self.table.usesAlternatingRowBackgroundColors=NO;self.table.style=NSTableViewStyleFullWidth;self.table.rowHeight=26;self.table.autosaveName=@"LookLAN-columns-v2";self.table.autosaveTableColumns=YES;self.table.target=self;self.table.doubleAction=@selector(showGeneral:);
+    self.table=[[NSTableView alloc]initWithFrame:scroll.bounds];self.table.dataSource=self;self.table.delegate=self;self.table.usesAlternatingRowBackgroundColors=NO;self.table.style=NSTableViewStyleFullWidth;self.table.rowHeight=26;self.table.autosaveName=@"LookLAN-columns-v2";self.table.autosaveTableColumns=NO;self.table.target=self;self.table.doubleAction=@selector(showGeneral:);
     const CGFloat widths[]={116,122,154,148,156,124,82,128,150,150};
     for(unsigned c=0;c<10;++c){NSTableColumn *column=[[NSTableColumn alloc]initWithIdentifier:[NSString stringWithFormat:@"%u",c]];column.width=widths[c];column.sortDescriptorPrototype=[NSSortDescriptor sortDescriptorWithKey:column.identifier ascending:YES];[self.table addTableColumn:column];}
     scroll.documentView=self.table;scroll.borderType=NSNoBorder;self.hostScroll=scroll;
@@ -81,11 +92,12 @@ static desktop_app_t app;
     sideScroll.frame=NSMakeRect(0,0,216,594);scroll.frame=NSMakeRect(0,0,866,424);self.detailTabs.frame=NSMakeRect(0,0,866,170);self.detailTabs.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
     [self.hostSplit addSubview:scroll];[self.hostSplit addSubview:self.detailPane];[self.hostSplit adjustSubviews];[self.hostSplit setPosition:424 ofDividerAtIndex:0];
     [self.networkSplit addSubview:sideScroll];[self.networkSplit addSubview:self.hostSplit];[self.networkSplit adjustSubviews];[self.networkSplit setPosition:216 ofDividerAtIndex:0];
-    self.networkSplit.autosaveName=@"LookLAN-network-split-v2";self.hostSplit.autosaveName=@"LookLAN-details-split-v2";[content addSubview:self.networkSplit];
+    [content addSubview:self.networkSplit];
     self.status=[NSTextField labelWithString:@""];self.status.frame=NSMakeRect(14,10,1092,22);self.status.autoresizingMask=NSViewWidthSizable;self.status.font=[NSFont monospacedDigitSystemFontOfSize:11 weight:NSFontWeightRegular];self.status.textColor=NSColor.secondaryLabelColor;self.networkInfo.font=[NSFont systemFontOfSize:11];self.networkInfo.textColor=NSColor.secondaryLabelColor;[content addSubview:self.status];
     self.visible=[NSMutableArray new];[self layoutTopControls];[self populateInterfaces];[self localize];
     NSMenu *context=[NSMenu new];NSArray *contextNames=@[[self tr:"Copy IP" ru:"Копировать IP"],[self tr:"Copy MAC" ru:"Копировать MAC"],[self tr:"Properties" ru:"Свойства"],[self tr:"Acknowledge" ru:"Подтвердить"],[self tr:"Rescan host" ru:"Повторно проверить узел"],@"Web",@"HTTPS",@"SSH",@"SMB",@"RDP",[self tr:"Copy hostname" ru:"Копировать имя узла"],@"Ping",@"Traceroute",[self tr:"Scan ports" ru:"Проверить порты"]];for(NSUInteger i=0;i<contextNames.count;++i){NSMenuItem *item=[context addItemWithTitle:contextNames[i] action:@selector(contextAction:) keyEquivalent:@""];item.target=self;item.tag=(NSInteger)i;}self.table.menu=context;
     self.timer=[NSTimer timerWithTimeInterval:.05 target:self selector:@selector(tick:) userInfo:nil repeats:YES];[[NSRunLoop mainRunLoop]addTimer:self.timer forMode:NSRunLoopCommonModes];[[NSRunLoop mainRunLoop]addTimer:self.timer forMode:NSModalPanelRunLoopMode];desktop_reload_profiles(&app);
+    [[NSWorkspace sharedWorkspace].notificationCenter addObserver:self selector:@selector(appearanceChanged:) name:NSWorkspaceAccessibilityDisplayOptionsDidChangeNotification object:nil];[self appearanceChanged:nil];
     [self.window makeKeyAndOrderFront:nil];[NSApp activateIgnoringOtherApps:YES];
 }
 - (CGFloat)splitView:(NSSplitView *)split constrainMinCoordinate:(CGFloat)proposed ofSubviewAt:(NSInteger)index{(void)proposed;(void)index;return split==self.networkSplit ? 190:180;}
@@ -174,7 +186,7 @@ static desktop_app_t app;
         return (item.tag==4 || item.tag==11 || item.tag==12 || item.tag==13) ? idle:YES;
     }
     if(item.action==@selector(ping:) || item.action==@selector(trace:))return idle && self.table.selectedRow>=0;
-if(item.action==@selector(openProfile:) || item.action==@selector(editProfile:) || item.action==@selector(single:))return !app.scanning && !app.monitoring && !app.tools && !app.io && !app.closing;if(item.action==@selector(saveProfile:) || item.action==@selector(export:))return !app.io && !app.closing;if(item.action==@selector(notes:)){NSInteger row=self.table.selectedRow;return row>=0 && row<(NSInteger)self.visible.count && self.visible[(NSUInteger)row].unsignedLongLongValue<app.host_count;}return !app.closing;}
+if(item.action==@selector(openProfile:) || item.action==@selector(editProfile:) || item.action==@selector(single:))return !app.scanning && !app.monitoring && !app.tools && !app.io && !app.closing;if(item.action==@selector(saveProfile:))return !app.io && !app.scanning && !app.monitoring && !app.tools && !app.history_job && !app.history_pending && !app.closing;if(item.action==@selector(export:))return !app.io && !app.closing;if(item.action==@selector(notes:)){NSInteger row=self.table.selectedRow;return row>=0 && row<(NSInteger)self.visible.count && self.visible[(NSUInteger)row].unsignedLongLongValue<app.host_count;}return !app.closing;}
 - (void)selectInterface:(id)sender{(void)sender;if(desktop_select(&app,(size_t)self.interfaces.indexOfSelectedItem)){[self populateInterfaces];[self refreshRows];}}
 - (void)language:(NSMenuItem *)sender{desktop_language(&app,(unsigned)sender.tag,self.systemLanguage.UTF8String);[self localize];}
 - (void)filter:(id)sender{(void)sender;[self refreshRows];}
@@ -219,12 +231,19 @@ if(item.action==@selector(openProfile:) || item.action==@selector(editProfile:) 
         self.rowsDirty=YES;
         if(app.error[0] && !app.scanning && !NSApp.modalWindow)[self message:text(app.error)];
     }
+    [self configurePersistence];
     if(self.rowsDirty && (!app.scanning || NSDate.timeIntervalSinceReferenceDate>=self.nextRowsRefresh))[self refreshRows];
 }
 - (void)remapProfile{self.remapping=YES;NSAlert *alert=[NSAlert new];alert.messageText=[self tr:"Profile interface unavailable" ru:"Интерфейс профиля недоступен"];[alert addButtonWithTitle:[self tr:"Use selected interface" ru:"Использовать выбранный интерфейс"]];[alert addButtonWithTitle:[self tr:"Cancel" ru:"Отмена"]];NSPopUpButton *combo=[[NSPopUpButton alloc]initWithFrame:NSMakeRect(0,0,320,28)];for(size_t i=0;i<app.interface_count;++i)[combo addItemWithTitle:text(app.interfaces[i].name)];if(app.selected<app.interface_count)[combo selectItemAtIndex:(NSInteger)app.selected];alert.accessoryView=combo;NSModalResponse response=[alert runModal];if(!app.closing)desktop_profile_rebind(&app,response==NSAlertFirstButtonReturn ? (size_t)combo.indexOfSelectedItem:SIZE_MAX);self.remapping=NO;}
 - (void)export:(id)sender{(void)sender;if(app.closing || app.io)return;NSSavePanel *panel=NSSavePanel.savePanel;panel.nameFieldStringValue=@"LookLAN.csv";if([panel runModal]==NSModalResponseOK && !app.closing){NSString *ext=panel.URL.pathExtension.lowercaseString;report_format_t format=[ext isEqual:@"html"] ? REPORT_HTML : [ext isEqual:@"txt"] ? REPORT_TXT : REPORT_CSV;if(!desktop_export(&app,panel.URL.path.fileSystemRepresentation,format))[self message:[self tr:"Export failed" ru:"Ошибка экспорта"]];}}
 - (void)openProfile:(id)sender{(void)sender;if(app.closing || app.scanning || app.monitoring || app.tools || app.io)return;NSOpenPanel *panel=NSOpenPanel.openPanel;panel.allowedFileTypes=@[@"lanprofile"];if([panel runModal]==NSModalResponseOK && !app.closing){if(!desktop_profile_open(&app,panel.URL.path.fileSystemRepresentation))[self message:text(app.error)];else{[self populateInterfaces];[self refreshRows];}}}
-- (void)saveProfile:(id)sender{(void)sender;if(app.closing || app.io)return;NSSavePanel *panel=NSSavePanel.savePanel;panel.nameFieldStringValue=@"LookLAN.lanprofile";if([panel runModal]==NSModalResponseOK && !app.closing && !desktop_profile_save(&app,panel.URL.path.fileSystemRepresentation))[self message:[self tr:"Profile save failed" ru:"Не удалось сохранить профиль"]];}
+- (void)saveProfile:(id)sender{(void)sender;if(app.closing || app.io || app.scanning || app.monitoring || app.tools || app.history_job || app.history_pending)return;
+    NSAlert *panel=[NSAlert new];panel.messageText=[self tr:"Save profile" ru:"Сохранить профиль"];panel.informativeText=[self tr:"The profile and its history are stored in the profiles folder. Saving enables persistent settings." ru:"Профиль и его история сохраняются в папке profiles. Сохранение включает постоянные настройки."];
+    [panel addButtonWithTitle:[self tr:"Save" ru:"Сохранить"]];[panel addButtonWithTitle:[self tr:"Cancel" ru:"Отмена"]];NSTextField *field=[[NSTextField alloc]initWithFrame:NSMakeRect(0,0,360,24)];field.stringValue=@"LookLAN.lanprofile";panel.accessoryView=field;
+    if([panel runModal]!=NSAlertFirstButtonReturn || app.closing)return;NSString *name=field.stringValue;if(!name.length || [name containsString:@"/"] || [name containsString:@"\\"]){[self message:[self tr:"Invalid profile name" ru:"Некорректное имя профиля"]];return;}if(![name hasSuffix:@".lanprofile"])name=[name stringByAppendingString:@".lanprofile"];
+    NSString *path=[text(app.profiles_directory) stringByAppendingPathComponent:name];if([NSFileManager.defaultManager fileExistsAtPath:path]){NSData *bytes=[NSData dataWithContentsOfFile:path];profile_t *existing=malloc(sizeof(*existing));BOOL valid=existing && bytes && bytes.length<=65536 && profile_parse(bytes.bytes,bytes.length,existing,NULL,0);free(existing);if(!valid){[self message:[self tr:"Existing profile is incompatible or unreadable. Save under a different name." ru:"Существующий профиль несовместим или недоступен. Сохраните под другим именем."]];return;}NSAlert *confirm=[NSAlert new];confirm.messageText=[self tr:"Replace existing profile?" ru:"Заменить существующий профиль?"];[confirm addButtonWithTitle:[self tr:"Replace" ru:"Заменить"]];[confirm addButtonWithTitle:[self tr:"Cancel" ru:"Отмена"]];if([confirm runModal]!=NSAlertFirstButtonReturn)return;}
+    if(!desktop_profile_save(&app,name.fileSystemRepresentation))[self message:text(app.error[0] ? app.error:desktop_tr(&app,"Profile save failed","Не удалось сохранить профиль"))];}
+
 - (void)about:(id)sender{(void)sender;[self message:@"Look@LAN-ng " @APP_VERSION @"\n© nr084, " @APP_BUILD_YEAR];}
 - (void)showText:(NSString *)value title:(NSString *)title{if(app.closing)return;NSAlert *alert=[NSAlert new];alert.messageText=title;[alert addButtonWithTitle:[self tr:"Close" ru:"Закрыть"]];NSScrollView *scroll=[[NSScrollView alloc]initWithFrame:NSMakeRect(0,0,680,400)];scroll.hasVerticalScroller=YES;NSTextView *view=[[NSTextView alloc]initWithFrame:scroll.bounds];view.editable=NO;view.string=value;scroll.documentView=view;alert.accessoryView=scroll;[alert runModal];}
 - (void)history:(id)sender{(void)sender;char *value=malloc(128*1024);if(!value)return;desktop_history(&app,value,128*1024);[self showText:text(value) title:[self tr:"History" ru:"История"]];free(value);}
@@ -245,5 +264,6 @@ if(item.action==@selector(openProfile:) || item.action==@selector(editProfile:) 
 @end
 int main(int argc,char **argv){@autoreleasepool {
     if(argc>1 && !strcmp(argv[1],"--smoke-test"))return desktop_smoke(NSLocale.preferredLanguages.firstObject.UTF8String);
+    if(argc==3 && !strcmp(argv[1],"--validation-data-dir")){if(argv[2][0]!='/')return 2;setenv("LOOKLAN_DATA_DIR",argv[2],1);}
     [NSApplication sharedApplication];NSApp.activationPolicy=NSApplicationActivationPolicyRegular;__attribute__((objc_precise_lifetime)) LANDelegate *delegate=[LANDelegate new];NSApp.delegate=delegate;[NSApp run];return 0;
 }}
