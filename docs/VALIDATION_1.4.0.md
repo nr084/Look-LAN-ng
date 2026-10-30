@@ -1,6 +1,6 @@
 # Validation 1.4.0 / Проверки
 
-Windows/Linux release candidate, 30 October 2026. All compilation occurred locally on Windows. macOS is independently built, tested and published on Mac; no macOS 1.4.0 validation is claimed here.
+Windows/Linux stable release, 30 October 2026. All compilation occurred locally on Windows. macOS is independently built, tested and published on Mac; no macOS 1.4.0 validation is claimed here.
 
 | Final artifact | Actual verification |
 | --- | --- |
@@ -35,3 +35,6 @@ Final real Windows/Ubuntu LAN scans. IP and MAC addresses are blurred using the 
 | `look@lan-ng-linux-x64-1.4.0.zip` | `25286f85cc33a0db0ac5baced923c5bda8e77b19634ac6cb26c230c10e2ea87a` |
 
 Local detailed evidence remains under `build/validation`: final CTest/build/packing logs, native ARM report, Linux native/GTK results, and `windows-1.4.0-profile-theme-results.json`. Private addresses and credentials are not included in this document.
+
+
+Publication: stable v1.4.0; all four public ZIPs downloaded and SHA-256 verified. Earlier numeric releases removed only afterward. GitHub image audit: current main has two screenshots (both IP/MAC blurred) and the app icon; the sole current release references these two images. No issues, issue comments or review comments; wiki and discussions disabled. Source Git history/tags have not been rewritten and can retain historical image blobs.

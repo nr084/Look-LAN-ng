@@ -1,6 +1,6 @@
-# Current Windows/Linux candidate — 1.4.0, 30 October 2026
+# Current Windows/Linux release — 1.4.0, 30 October 2026
 
-Profile v2, temporary mode without settings writes, singleton profile selection and persistent host/event history are implemented for Windows/Linux. Old v1 profiles are intentionally unsupported. Host/device notes and individual Ping/Trace samples remain session-only; mDNS/active IPv6 remain future scope. Windows/Linux compile locally on Windows; Mac builds/tests/publishes independently. See [current validation](VALIDATION_1.4.0.md) and [profiles/history](PROFILES.md).
+Profile v2, temporary mode without settings writes, singleton profile selection and persistent host/event history are implemented for Windows/Linux. Windows System/Light/Dark themes and conditional preference persistence are implemented. Stable 1.4.0 was published; four downloads verified before older releases were deleted. Old v1 profiles are intentionally unsupported. Host/device notes and individual Ping/Trace samples remain session-only; mDNS/active IPv6 remain future scope. Windows/Linux compile locally on Windows; Mac builds/tests/publishes independently. See [current validation](VALIDATION_1.4.0.md) and [profiles/history](PROFILES.md).
 
 The following records describe earlier versions and their earlier limitations, not current disk-history support.
 
