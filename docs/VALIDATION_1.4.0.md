@@ -38,3 +38,11 @@ Local detailed evidence remains under `build/validation`: final CTest/build/pack
 
 
 Publication: stable v1.4.0; all four public ZIPs downloaded and SHA-256 verified. Earlier numeric releases removed only afterward. GitHub image audit: current main has two screenshots (both IP/MAC blurred) and the app icon; the sole current release references these two images. No issues, issue comments or review comments; wiki and discussions disabled. Source Git history/tags have not been rewritten and can retain historical image blobs.
+
+### Final privacy-edit prompts
+
+Mode: built-in imagegen edit, applied to screenshots whose IP values were already blurred. Final workspace assets: `docs/images/windows-1.4.0.png`, `docs/images/linux-1.4.0.png`.
+
+Windows: “Edit target: existing privacy-edited Windows screenshot. Make one additional privacy edit only: strongly blur ALL MAC/hardware addresses throughout the entire screenshot until hex digits are impossible to read, including every row of the MAC-address table column and any details or other locations. Preserve the existing strong blur over ALL IP/CIDR/gateway addresses. Preserve the captured native dark interface, all non-address text/hostnames/vendors/dates/icons, empty panels, geometry and version faithfully. No redesign, no crop, no new text, do not alter menu/toolbar seam. Complete screenshot same composition.”
+
+Ubuntu: “Edit target: existing privacy-edited real Ubuntu Look@LAN-ng screenshot. Privacy-only additional edit: strongly blur ALL MAC/hardware addresses everywhere until every hex digit is unreadable. Include ALL rows in the MAC Address table column and the MAC Address value in the bottom General details for the selected host. Preserve all existing strong IP/CIDR/range/gateway/DNS blur, including sidebar, table and General IP. Keep everything else faithfully: GTK interface, title, labels, vendors, hostnames, version, colors, geometry and complete screenshot. No redesign/crop/new text.”
