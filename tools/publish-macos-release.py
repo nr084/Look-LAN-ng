@@ -34,13 +34,16 @@ def main():
     parser.add_argument('--version', required=True)
     parser.add_argument('--source-repo', type=Path, required=True)
     parser.add_argument('--notes', type=Path, required=True)
+    parser.add_argument('--add-assets-to-published-release',action='store_true',help='Add the validated DMG to the Windows/Linux release without replacing other assets or notes')
     args = parser.parse_args()
     if sys.platform != 'darwin' or not re.fullmatch(r'\d+\.\d+\.\d+', args.version):
         raise SystemExit('Only stable macOS releases may be published here')
     proof = json.loads((ROOT / 'dist/macos-release-validation.json').read_text())
     if proof['version'] != args.version or proof['native_tests'] != 'passed' or proof['feature_complete'] is not True:
         raise SystemExit('Matching native validation is required')
-    assets = [ROOT / 'dist' / name for name in proof['assets']]
+    assets = [ROOT / 'dist' / name for name in proof['assets'] if name.endswith('.dmg')]
+    if len(assets)!=1:
+        raise SystemExit('Exactly one validated macOS DMG required; diagnostics ZIPs stay local')
     for file in assets:
         if not file.name.startswith('look@lan-ng-macos-') or digest(file) != proof['assets'][file.name]:
             raise SystemExit('Asset/proof mismatch')
@@ -53,8 +56,14 @@ def main():
     tag = 'v' + args.version
     listing = json.loads(run('gh', 'api', f'repos/{REPOSITORY}/releases?per_page=100'))
     existing = next((r for r in listing if r['tag_name'] == tag), None)
+    if existing and not existing['draft'] and not args.add_assets_to_published_release:
+        raise SystemExit('Use explicit add-assets mode for a published Windows/Linux release')
+    preserved={a['name']:a.get('digest') for a in existing['assets']} if existing else {}
+    notes=args.notes.read_text()
     if existing and not existing['draft']:
-        raise SystemExit('Published releases are immutable')
+        previous=existing.get('body') or ''
+        block='<!-- macos-release -->\n'+notes+'\n<!-- /macos-release -->'
+        notes=re.sub(r'<!-- macos-release -->.*?<!-- /macos-release -->',lambda _:block,previous,flags=re.S) if '<!-- macos-release -->' in previous else previous+'\n\n'+block
     if not existing:
         run('gh', 'release', 'create', tag, '--repo', REPOSITORY, '--target', commit,
             '--draft', '--title', 'Look@LAN-ng ' + args.version + ' — macOS', '--notes-file', args.notes)
@@ -67,8 +76,11 @@ def main():
         else:
             run('gh', 'release', 'upload', tag, file, '--repo', REPOSITORY)
     release = release_by_tag(tag)
-    if {a['name'] for a in release['assets']} != {f.name for f in assets}:
+    if {a['name'] for a in release['assets']} != set(preserved) | {f.name for f in assets}:
         raise SystemExit('Unexpected draft assets')
+    for name,value in preserved.items():
+        if next(a for a in release['assets'] if a['name']==name).get('digest')!=value:
+            raise SystemExit('Existing platform asset changed')
     for file in assets:
         found = next(a for a in release['assets'] if a['name'] == file.name)
         if found.get('digest') != 'sha256:' + digest(file) or found['size'] != file.stat().st_size:
@@ -77,7 +89,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='looklan-publish-') as temp:
         payload = Path(temp) / 'release.json'
         payload.write_text(json.dumps({'tag_name': tag, 'draft': False, 'prerelease': False,
-                                       'make_latest': 'true', 'body': args.notes.read_text()}))
+                                       'make_latest': 'true', 'body': notes}))
         run('gh', 'api', '--method', 'PATCH', f'repos/{REPOSITORY}/releases/{release["id"]}',
             '--input', payload)
     final = release_by_tag(tag)

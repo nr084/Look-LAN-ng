@@ -1,5 +1,6 @@
 """Package locally cross-built ports; verify contents, signatures and executable modes."""
 import argparse,re,hashlib,json,os,plistlib,shutil,struct,subprocess,tempfile,urllib.request,zipfile,sys
+from build_preflight import fetch,download
 sys.dont_write_bytecode=True
 from pathlib import Path
 from verify_macos_port import verify_bundle as verify_code_seals,verify_binary
@@ -15,8 +16,7 @@ def verify_bundle(codesign,bundle):
     del codesign
     verify_code_seals(bundle)
 def upx_tool():
-    request=urllib.request.Request('https://api.github.com/repos/upx/upx/releases/latest',headers={'User-Agent':'LookLAN-ng-port-builder'})
-    release=json.load(urllib.request.urlopen(request,timeout=30))
+    release=json.loads(fetch('https://api.github.com/repos/upx/upx/releases/latest'))
     assert not release['draft'] and not release['prerelease']
     version=release['tag_name'].removeprefix('v');asset=next(x for x in release['assets'] if x['name']==f'upx-{version}-win64.zip')
     directory=ROOT/'build/cross-tools/upx'/version;directory.mkdir(parents=True,exist_ok=True)
@@ -24,7 +24,7 @@ def upx_tool():
     stamp=directory/'verified-tool.json'
     if not tool.exists() or not stamp.exists():
         with tempfile.TemporaryDirectory(dir=ROOT/'build',prefix='upx-download-') as temp:
-            archive=Path(temp)/'upx.zip';urllib.request.urlretrieve(asset['browser_download_url'],archive)
+            archive=Path(temp)/'upx.zip';download(asset['browser_download_url'],archive)
             assert asset['digest']=='sha256:'+digest(archive),'Official UPX archive digest mismatch'
             with zipfile.ZipFile(archive) as z:z.extractall(directory)
             stamp.write_text(json.dumps({'archive_digest':asset['digest'],'exe_sha256':digest(tool)})+'\n')
@@ -51,6 +51,7 @@ def main():
     summary_path=ROOT/'dist/ports-package.json'
     summary=json.loads(summary_path.read_text(encoding='utf-8')) if summary_path.exists() else {}
     summary.update(build_host='Windows',upx=upx_version)
+    summary['build_preflight']=json.loads((ROOT/'build/linux-x64/preflight.json').read_text(encoding='utf-8'))
     readme=ROOT/('docs/DEVELOPMENT_README.txt' if args.development else 'docs/PORT_TESTING.txt')
     if args.target in ('all','macos'):
         llvm=sorted((tools/'macos/llvm').glob('*/bin/llvm-lipo.exe'),key=lambda p:tuple(map(int,p.parents[1].name.split('.'))))[-1].parent

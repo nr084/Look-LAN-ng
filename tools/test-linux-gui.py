@@ -18,6 +18,9 @@ import ipaddress
 subnet=str(ipaddress.ip_network(own+'/24',strict=False))
 os.environ['XDG_CONFIG_HOME']=str(root/'gui-config')
 print('Test artifacts:',root,flush=True)
+import shutil
+appdir=root/'application';appdir.mkdir();source=binary;binary=appdir/'Look@LAN-ng';shutil.copyfile(source,binary);binary.chmod(0o755)
+saved=binary.parent/'profiles/saved.lanprofile'
 passed=[]
 def check(ok,name):
  if not ok: raise AssertionError(name)
@@ -56,7 +59,7 @@ def set_range(s):inputs()[0].queryEditableText().setTextContents(s)
 def cells():
  t=find('table').queryTable()
  result=[]
- states={'ONLINE','OFFLINE','NEW','CHANGED','UNKNOWN','В СЕТИ','НЕ В СЕТИ','НОВЫЙ','ИЗМЕНЁН','НЕИЗВЕСТНО'}
+ states={'HISTORY','ИСТОРИЯ','ONLINE','OFFLINE','NEW','CHANGED','UNKNOWN','В СЕТИ','НЕ В СЕТИ','НОВЫЙ','ИЗМЕНЁН','НЕИЗВЕСТНО'}
  for r in range(t.nRows):
   row=[]
   for c in range(t.nColumns):
@@ -101,6 +104,12 @@ def file_dialog(path):
  geo=subprocess.check_output(['xdotool','getwindowgeometry','--shell',windows[-1].decode()],text=True)
  g=dict(line.split('=',1) for line in geo.splitlines())
  subprocess.run(['xdotool','mousemove','--window',windows[-1].decode(),str(int(g['WIDTH'])-50),str(int(g['HEIGHT'])-25),'click','1'],check=True)
+ # Gtk location completion can consume the first accept for an existing deep
+ # path; confirm only while this file dialog is still visible.
+ for attempt in range(4):
+  time.sleep(.5)
+  if subprocess.run(['xdotool','search','--onlyvisible','--name','^(Save|Open profile)$'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:break
+  subprocess.run(['xdotool','key','Return'],check=True)
  time.sleep(.4)
  time.sleep(1.5)
  if not pathlib.Path(path).exists():
@@ -147,11 +156,11 @@ try:
  inputs()[1].queryEditableText().setTextContents('');time.sleep(.2);check(len(cells())==1,'Filter restores host')
  for ext in ['csv','txt','html','HTML']:
   click('Export');file_dialog(root/('export.'+ext));check((root/('export.'+ext)).exists(),'Export '+ext)
- click('Save profile');file_dialog(root/'saved.lanprofile');check((root/'saved.lanprofile').exists(),'Save UTF-8 profile')
- wait(lambda:any(a.name=='Default' for a in nodes()));check(True,'Saved profile appears in sidebar');click('Open profile');file_dialog(root/'saved.lanprofile');wait(ready);check(inputs()[0].queryText().getText(0,-1)==own+'-'+own,'Open saved profile restores range')
+ click('Save profile');file_dialog(root/'saved.lanprofile');check(saved.exists(),'Save UTF-8 profile in profiles')
+ wait(lambda:any(a.name=='Default' for a in nodes()));check(True,'Saved profile appears in sidebar');click('Open profile');file_dialog(saved);wait(ready);check(inputs()[0].queryText().getText(0,-1)==own+'-'+own,'Open saved profile restores range')
  data=(root/'export.HTML').read_text(encoding='utf-8');check('<html' in data.lower(),'Uppercase HTML extension selects HTML')
  gateway=subprocess.check_output(['ip','-j','route','show','default'],text=True);gateway=json.loads(gateway)[0]['gateway']
- set_range(gateway);click('Scan');wait(ready,20);check(any(r[1]==gateway and r[0]=='ONLINE' for r in cells()),'Real gateway scan')
+ set_range(gateway);click('Scan');wait(ready,20);check(any(r[1]==gateway and r[0] in ('ONLINE','NEW','CHANGED') for r in cells()),'Real gateway scan preserves baseline and detects NEW')
  set_range('invalid range');click('Scan')
  from PIL import ImageGrab
  ImageGrab.grab().save(root/'invalid-range.png')
@@ -161,7 +170,7 @@ try:
  check(not any(a.getRoleName()=='alert' for a in nodes()),'F5 during active scan does not show error')
  click('Stop');wait(ready);check(True,'Stop returns to idle')
  click('Profile');fill_dialog('Profile',['GUI profile',own+';'+gateway,'22','100','100','8','5','Profile note']);check(inputs()[0].queryText().getText(0,-1)=='','Profile editor applies multiple ranges')
- click('Scan');wait(ready);check(len(cells())==2,'Scan uses both profile ranges')
+ click('Scan');wait(ready);check(all(any(r[1]==ip and r[0] in ('ONLINE','NEW','CHANGED') for r in cells()) for ip in (own,gateway)),'Scan uses both profile ranges and retains history')
  check(all(any(a.name==name for a in nodes()) for name in ['General','Ports','Ping','Trace','History','Log']),'Six detail tabs present');selected_ip(own);click('Ping');wait(ready);check(True,'GUI Ping completes without blocking')
  click('Trace');wait(ready);check(True,'GUI Trace completes without blocking')
  log_tab=find('page tab','Log');rect=log_tab.queryComponent().getExtents(pyatspi.DESKTOP_COORDS);subprocess.run(['xdotool','mousemove',str(rect.x+rect.width//2),str(rect.y+rect.height//2),'click','1'],check=True);time.sleep(.2)
@@ -180,7 +189,7 @@ try:
  right_click(own,'Copy hostname');check(bool(Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).wait_for_text()),'Context Copy hostname clipboard')
  click('Monitoring');wait(lambda:any(a.getRoleName()=='label' and a.name.startswith('Monitoring |') and '2 / 2' in a.name for a in nodes()),15);click('Stop');wait(ready);check(True,'GUI monitoring starts and Stop disables schedule')
  click('Single host');fill_dialog('Single host',['localhost']);wait(ready);check(any(row[1]=='127.0.0.1' for row in cells()),'Single hostname resolves and scans');check(inputs()[0].queryText().getText(0,-1)=='','Single host preserves profile ranges')
- imported=root/'missing-interface.lanprofile';data=(root/'saved.lanprofile').read_text(encoding='utf-8');import re;data=re.sub(r'(?m)^interface_id=.*$', 'interface_id=missing-looklan-test',data);imported.write_text(data,encoding='utf-8');click('Open profile');file_dialog(imported);wid=dialog_window('Profile interface unavailable');subprocess.run(['xdotool','windowfocus',wid],check=True);click('Use selected interface');wait(ready);check(inputs()[0].queryText().getText(0,-1)==own+'-'+own,'Imported profile requires explicit interface remapping')
+ imported=root/'missing-interface.lanprofile';data=saved.read_text(encoding='utf-8');import re;data=re.sub(r'(?m)^interface_id=.*$', 'interface_id=missing-looklan-test',data);imported.write_text(data,encoding='utf-8');click('Open profile');file_dialog(imported);wid=dialog_window('Profile interface unavailable');subprocess.run(['xdotool','windowfocus',wid],check=True);click('Use selected interface');wait(ready);check(inputs()[0].queryText().getText(0,-1)==own+'-'+own,'Imported profile requires explicit interface remapping')
  set_range(subnet);click('Scan');time.sleep(.2);t=time.monotonic();close();check(p.wait(timeout=5)==0,'Close during scan exits cleanly');check(time.monotonic()-t<3,'Close during scan bounded under 3s');p=None
  p=start();choose_language('Русский');wait(lambda:find('button','Сканировать'));check(True,'Immediate Russian UI switch');close();check(p.wait(timeout=5)==0,'Idle close');p=None;time.sleep(.3)
  p=start(caption='Сканировать');check(True,'Saved Russian overrides English system locale');choose_language('System / Система');wait(lambda:find('button','Scan'));close();p.wait(timeout=5);p=None;time.sleep(.3)

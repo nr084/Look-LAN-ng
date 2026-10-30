@@ -60,6 +60,7 @@ size_t monitor_observe(monitor_t *m, const lan_host_t *incoming, bool confirmed,
     if (index == SIZE_MAX) return index;
     lan_host_t *host = &m->hosts[index];
     if (confirmed) {
+        host->historical = false;
         if (!incoming->has_latency) host->has_latency = false;
         if (mac_changed) {
             if (!incoming->ports_checked) { host->port_count = 0; host->ports_checked = false; host->os_family = OS_UNKNOWN; host->os_confidence = 0; }
@@ -96,6 +97,7 @@ void monitor_finish(monitor_t *m, bool complete, uint64_t now) {
             if (h->address.family != 4 || h->interface_index != m->interface_index || !ranges_contains(m->ranges,m->range_count,ip) || !h->first_seen) continue;
             if (h->seen_round == m->round) { h->missed_rounds = 0; continue; }
             if (h->missed_rounds < 255) ++h->missed_rounds;
+            if (h->missed_rounds >= m->offline_threshold) h->historical = false;
             if (h->online && h->missed_rounds >= m->offline_threshold) { h->online = false; h->has_latency = false; add_event(m,MON_HOST_OFFLINE,i,NULL,h->hostname,now); }
         }
         for (size_t i = 0; i < *m->count; ++i) if (!m->hosts[i].online && m->hosts[i].first_seen) correlate_ip(m,i,now);

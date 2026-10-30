@@ -1,25 +1,44 @@
+# Look@LAN-ng 1.4.0
+
 ## Русский
 
-Look@LAN-ng 1.2.0 — компактный портативный LAN-сканер для Windows с интерфейсом на русском и английском.
-
-- Современные значки toolbar с лёгкой ретро-отсылкой, поддержка DPI 100–200%.
-- Исправлена проверка NetBIOS GROUP flag в оптимизированной ARM64 сборке; добавлены проверки порядка байтов.
-- Выбор языка: язык системы (по умолчанию), English, Русский. Русский Windows UI → русский; любой другой → английский. Выбор сохраняется.
-- Обнаружение IPv4-узлов через ARP/ICMP/TCP, DNS/NetBIOS-имена, MAC/OUI, TCP-порты, мониторинг, Ping/Trace, профили и CSV/TXT/HTML.
-- Три отдельных ZIP: `look@lan-ng-x86-1.2.0.zip`, `look@lan-ng-x64-1.2.0.zip`, `look@lan-ng-arm64-1.2.0.zip`. Каждый содержит один EXE для своей архитектуры.
-- Сборка и автоматические тесты для каждой архитектуры; UPX latest stable, максимальное сжатие, integrity и packed smoke tests. SHA-256 ZIP опубликованы ниже.
-
-Не выполнена полная ручная проверка Windows 10/11, разных физических адаптеров/мониторов, реальных сетевых отказов и длительного мониторинга. Optional IPv6 neighbor display и будущие Linux/macOS поставки не реализованы. Подробности: [SPEC_STATUS](https://github.com/nr084/Look-LAN-ng/blob/main/docs/SPEC_STATUS.md), [RELEASE_CHECK](https://github.com/nr084/Look-LAN-ng/blob/main/docs/RELEASE_CHECK.md).
+- Windows: тёмная и светлая темы, Вид → Тема. По умолчанию — системная; ручной выбор сохраняется только в постоянном режиме. Убрана белая полоса между меню и кнопками.
+- Временный запуск и сканирование не создают INI и каталоги настроек. «Сохранить профиль» включает сохранение настроек.
+- Профили v2 в `profiles`; единственный профиль выбирается при старте. История хостов и последние 10 000 событий продолжаются после перезапуска и при мониторинге. Файлы `.lanprofile` и `.lanprofile.lanhistory` нужно переносить вместе. Старые профили не поддерживаются.
+- Последние stable compiler и IEEE MAC база проверяются перед каждой сборкой. LLVM 23.1.4, LLVM-MinGW 20261020, IEEE MA-L 40 421; максимальное сжатие UPX 5.3.0.
+- Обновлены описание и реальные Windows/Ubuntu скриншоты с размытыми IP и MAC.
 
 ## English
 
-Look@LAN-ng 1.2.0 is a compact portable Windows LAN scanner with Russian and English interfaces.
+- Windows System/Light/Dark themes in View → Theme. System is the default; explicit preference is saved only in persistent mode. Removed the white menu/toolbar separator.
+- Temporary scans create no INI or settings directories. Successfully saving a profile enables settings persistence.
+- Profile v2 in `profiles`, automatic selection of a sole profile, persistent host snapshots and the latest 10,000 events across scans/monitoring. Keep `.lanprofile` and `.lanprofile.lanhistory` together. Legacy profiles are unsupported.
+- Every build checks the latest stable compiler and refreshes IEEE MAC data. LLVM 23.1.4, LLVM-MinGW 20261020, 40,421 MA-L prefixes; maximum UPX 5.3.0 compression.
+- Updated bilingual description and actual Windows/Ubuntu screenshots with blurred IP and MAC addresses.
 
-- Modern toolbar icons with a subtle retro influence; DPI 100–200% support.
-- Fixed the NetBIOS GROUP flag check in optimized ARM64 builds; added wire-byte-order regression checks.
-- Language selection: system language (default), English, Русский. Russian Windows UI selects Russian; all other languages select English. Your choice is saved.
-- IPv4 discovery via ARP/ICMP/TCP, DNS/NetBIOS names, MAC/OUI lookup, TCP ports, monitoring, Ping/Trace, profiles and CSV/TXT/HTML export.
-- Three separate ZIPs: `look@lan-ng-x86-1.2.0.zip`, `look@lan-ng-x64-1.2.0.zip` and `look@lan-ng-arm64-1.2.0.zip`. Each contains one executable for its architecture.
-- Each architecture is built and automatically tested; latest stable UPX with maximum compression, integrity and packed smoke tests. ZIP SHA-256 checksums are published below.
+## Проверки / Validation
 
-The full manual Windows 10/11, physical adapter/monitor, real network failure and long-running monitoring matrix remains untested. Optional IPv6 neighbor display and future Linux/macOS distributions are not implemented. See the repository's SPEC_STATUS and RELEASE_CHECK documents for details.
+Windows x86/x64: 17 tests each and four packed smokes. Native Windows ARM64: 13 suites and four packed smokes. Ubuntu 26.04.1 x64: nine native suites, 39 GTK workflows, real LAN scanning, 100 Scan/Stop cycles. Windows profile/theme GUI: 25 checks. [Evidence and remaining limits](https://github.com/nr084/Look-LAN-ng/blob/main/docs/VALIDATION_1.4.0.md).
+
+Windows 10/full hardware/physical DPI/older Ubuntu matrices remain untested. / Полная аппаратная матрица, Windows 10, физические DPI и старые Ubuntu не проверены. Заметки устройств и отдельные Ping/Trace-пробы не сохраняются / Device notes and individual Ping/Trace samples remain session-only.
+
+<!-- macos-release -->
+macOS 1.4.0 собирается, проверяется и публикуется отдельно на Mac; DMG пока отсутствует. / macOS 1.4.0 will be built, tested and published independently on Mac; DMG is pending.
+<!-- /macos-release -->
+
+## Скриншоты / Screenshots
+
+![Windows dark theme](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/windows-1.4.0.png)
+
+![Ubuntu](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/linux-1.4.0.png)
+
+## SHA-256
+
+| ZIP | SHA-256 |
+| --- | --- |
+| `look@lan-ng-x86-1.4.0.zip` | `620fcedf2ddf88171fbbef81a61735d423cd51fe23b43a748e5a3f3f08fb0cb7` |
+| `look@lan-ng-x64-1.4.0.zip` | `dfbe6dbf231e5412743a83fd80dc8633864e2366689fc9f1618e0ab90190ecde` |
+| `look@lan-ng-arm64-1.4.0.zip` | `40587592d03377fe7dc88195b410f7830f6a2d4b8e38fad7d6a08e526bb8a005` |
+| `look@lan-ng-linux-x64-1.4.0.zip` | `25286f85cc33a0db0ac5baced923c5bda8e77b19634ac6cb26c230c10e2ea87a` |
+
+© nr084, 2026

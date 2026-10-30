@@ -50,13 +50,9 @@ Intel Mac hardware remain unverified. Device notes/history are session-only.
 
 Final builds after real LAN scans, not sample data. IP addresses are blurred for privacy. / IP-адреса скрыты размытием.
 
-![Windows 1.3.2 RU](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/windows-1.3.2.png?privacy=20261014)
 
-![Ubuntu 1.3.2 EN](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/linux-1.3.2.png?privacy=20261014)
 
-![macOS 1.3.2 RU](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/macos-1.3.2-ru.png?privacy=20261014)
 
-[Mac English screenshot](https://raw.githubusercontent.com/nr084/Look-LAN-ng/main/docs/images/macos-1.3.2-en.png?privacy=20261014)
 
 ## SHA-256
 
@@ -67,4 +63,3 @@ Final builds after real LAN scans, not sample data. IP addresses are blurred for
 | `look@lan-ng-arm64-1.3.2.zip` | `e438ee62294bbfc79859cc7f924f8019cf2b7214671621b9c27b9609a0bb8015` |
 | `look@lan-ng-linux-x64-1.3.2.zip` | `cc2fcc0b3591421a5a74c25883199299396071679f7d309a7be7081f0efa0132` |
 | `look@lan-ng-macos-universal-1.3.2.dmg` | `6ed919c223c43e0ee4d5962816e170693be089b7d7f027b9ea81d33487084a3c` |
-

@@ -1,4 +1,4 @@
-param([string]$Executable='dist/1.2.0/x64/Look@LAN-ng.exe',[string]$Output='docs/images/windows-1.2.0.png',[int]$Width=1600,[int]$Height=650)
+param([string]$Executable='dist/windows-x64/Look@LAN-ng.exe',[string]$Output='build/validation/windows-release.png',[int]$Width=1600,[int]$Height=650,[ValidateSet('System','Light','Dark')][string]$Theme='System',[switch]$SkipScan)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Drawing.Common
 $looklanCode = @'
@@ -19,7 +19,11 @@ public static class LooklanCapture {
  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window,out Rect rect);
  [DllImport("user32.dll")] static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
  [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags);
+ [DllImport("user32.dll")] static extern bool RedrawWindow(IntPtr window,IntPtr rect,IntPtr region,uint flags);
+ [DllImport("user32.dll")] static extern uint GetDpiForWindow(IntPtr window);
  public static IntPtr Find(uint pid){IntPtr result=IntPtr.Zero;EnumWindows((window,data)=>{uint owner;GetWindowThreadProcessId(window,out owner);if(owner==pid){var name=new System.Text.StringBuilder(128);GetClassName(window,name,name.Capacity);if(name.ToString()=="LookAtLANngWindow"){result=window;return false;}}return true;},IntPtr.Zero);return result;}
+ public static void SelectFirst(IntPtr list){var previous=SetThreadDpiAwarenessContext(new IntPtr(-4));try{IntPtr header=FindWindowEx(list,IntPtr.Zero,"SysHeader32",null);Rect rect;int height=GetWindowRect(header,out rect)?rect.bottom-rect.top:24;int x=12,y=height+(int)GetDpiForWindow(list)/12;IntPtr point=new IntPtr((y<<16)|x);SendMessage(list,0x201,new IntPtr(1),point);SendMessage(list,0x202,IntPtr.Zero,point);}finally{SetThreadDpiAwarenessContext(previous);}}
+ public static void Refresh(IntPtr window){RedrawWindow(window,IntPtr.Zero,IntPtr.Zero,0x1|0x4|0x80|0x100|0x400);}
  public static void Capture(IntPtr window,string path){var previousDpi=SetThreadDpiAwarenessContext(new IntPtr(-4));try{Rect rect;if(!GetWindowRect(window,out rect))throw new Exception("No window rectangle");using(var bitmap=new Bitmap(rect.right-rect.left,rect.bottom-rect.top)){using(var graphics=Graphics.FromImage(bitmap)){var dc=graphics.GetHdc();try{if(!PrintWindow(window,dc,2))throw new Exception("PrintWindow failed");}finally{graphics.ReleaseHdc(dc);}}bitmap.Save(path,ImageFormat.Png);}}finally{SetThreadDpiAwarenessContext(previousDpi);}}
 }
 '@
@@ -31,6 +35,7 @@ New-Item -ItemType Directory -Force (Split-Path $looklanOutput) > $null
 $looklanSettings=Join-Path (Split-Path $looklanExe) 'Look@LAN-ng.ini'
 $looklanHadSettings=Test-Path -LiteralPath $looklanSettings
 $looklanProcess=Start-Process -FilePath $looklanExe -PassThru -WindowStyle Hidden
+$null=$looklanProcess.WaitForInputIdle(10000)
 $looklanWindow=[IntPtr]::Zero
 try {
  $looklanDeadline=[DateTime]::UtcNow.AddSeconds(10)
@@ -38,14 +43,20 @@ try {
  if($looklanWindow -eq [IntPtr]::Zero){throw 'Owned application window not found'}
  [LooklanCapture]::SetWindowPos($looklanWindow,[IntPtr]::Zero,40,40,$Width,$Height,20) > $null
  [LooklanCapture]::ShowWindow($looklanWindow,4) > $null
+ [LooklanCapture]::SendMessage($looklanWindow,0x111,[IntPtr](@{System=160;Light=161;Dark=162}[$Theme]),[IntPtr]::Zero) > $null
+ if(!$SkipScan){
  [LooklanCapture]::SendMessage($looklanWindow,0x111,[IntPtr]101,[IntPtr]::Zero) > $null
  $looklanToolbar=[LooklanCapture]::FindWindowEx($looklanWindow,[IntPtr]::Zero,'ToolbarWindow32',$null)
  $looklanDeadline=[DateTime]::UtcNow.AddSeconds(120)
  Start-Sleep -Milliseconds 500
  while([LooklanCapture]::SendMessage($looklanToolbar,0x409,[IntPtr]101,[IntPtr]::Zero) -eq [IntPtr]::Zero){if([DateTime]::UtcNow -ge $looklanDeadline){throw 'Real scan timed out'};Start-Sleep -Milliseconds 250}
  Start-Sleep -Milliseconds 1500
+ }
  $looklanList=[LooklanCapture]::FindWindowEx($looklanWindow,[IntPtr]::Zero,'SysListView32',$null)
- if($looklanList -ne [IntPtr]::Zero){[LooklanCapture]::SendMessage($looklanList,0x100,[IntPtr]0x24,[IntPtr]::Zero) > $null;Start-Sleep -Milliseconds 200}
+ if($looklanList -ne [IntPtr]::Zero){[LooklanCapture]::SelectFirst($looklanList);Start-Sleep -Milliseconds 200}
+ [LooklanCapture]::ShowWindow($looklanWindow,4) > $null
+ [LooklanCapture]::Refresh($looklanWindow)
+ Start-Sleep -Milliseconds 200
  [LooklanCapture]::Capture($looklanWindow,$looklanOutput)
  Write-Output $looklanOutput
 } finally {

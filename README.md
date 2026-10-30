@@ -1,113 +1,62 @@
 # Look@LAN-ng
 
-**RU:** Компактный LAN-сканер и монитор сети для Windows, Ubuntu/Linux и macOS.
-Native интерфейс, русский и английский языки. Без облака, аккаунтов, telemetry,
-драйверов и фоновых служб.
+**RU:** Портативный LAN-сканер и монитор сети с нативным интерфейсом на русском и английском. Windows x86/x64/ARM64, Ubuntu/Linux x64; macOS universal собирается и публикуется отдельно на Mac. Без облака, аккаунтов, телеметрии, драйверов и фоновых служб.
 
-**EN:** A compact LAN scanner and network monitor for Windows, Ubuntu/Linux and
-macOS. Native Russian/English interfaces. No cloud, accounts, telemetry, drivers
-or background services.
+**EN:** A portable LAN scanner and network monitor with native Russian/English interfaces. Windows x86/x64/ARM64 and Ubuntu/Linux x64; macOS universal is built and published separately on Mac. No cloud, accounts, telemetry, drivers or background services.
 
-[Release 1.3.2](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.3.2) ·
-[Build](BUILD.md) · [Specification / ТЗ](docs/SPECIFICATION.md) ·
-[Implementation status](docs/SPEC_STATUS.md)
+[Release 1.4.0](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.4.0) · [Build / Сборка](BUILD.md) · [Profiles and history / Профили и история](docs/PROFILES.md) · [Validation / Проверки](docs/VALIDATION_1.4.0.md)
 
 ## Скачать / Download
 
-| Платформа / Platform | Архитектура / Architecture | Файл / File |
+| Платформа / Platform | Архитектура / Architecture | Поставка / Package |
 | --- | --- | --- |
-| Windows | x86 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-x86-1.3.2.zip) |
-| Windows | x64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-x64-1.3.2.zip) |
-| Windows | ARM64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-arm64-1.3.2.zip) |
-| Ubuntu/Linux | x64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-linux-x64-1.3.2.zip) |
-| macOS | Universal Intel + Apple Silicon | [DMG](https://github.com/nr084/Look-LAN-ng/releases/download/v1.3.2/look%40lan-ng-macos-universal-1.3.2.dmg) |
+| Windows | x86 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.4.0/look%40lan-ng-x86-1.4.0.zip) |
+| Windows | x64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.4.0/look%40lan-ng-x64-1.4.0.zip) |
+| Windows | ARM64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.4.0/look%40lan-ng-arm64-1.4.0.zip) |
+| Ubuntu/Linux | x64 | [ZIP](https://github.com/nr084/Look-LAN-ng/releases/download/v1.4.0/look%40lan-ng-linux-x64-1.4.0.zip) |
 
-**Windows:** распакуйте один EXE своей архитектуры и запустите его. Установка и
-права администратора не нужны. / Extract the single EXE for your architecture
-and run it; no installer or administrator rights required.
+Один Windows ZIP содержит один EXE. Linux: распакуйте ZIP и запустите `./LookLAN.sh` в графической сессии с GTK 3. / Each Windows ZIP contains one EXE. On Linux, extract the ZIP and run `./LookLAN.sh` in a graphical session with GTK 3.
 
-**Ubuntu/Linux:** распакуйте ZIP и запустите `./LookLAN.sh`. Нужны графическая
-сессия и системные GTK 3 libraries. Ubuntu 22.04+ — цель сборки; native-проверки
-выполнены на Ubuntu 26.04.1 x64. / Extract and run `./LookLAN.sh` with system
-GTK 3 libraries. Ubuntu 22.04+ is the build baseline; runtime checks used 26.04.1.
-
-**macOS:** откройте DMG и перенесите приложение в Applications. Цель сборки —
-macOS 13+, подпись ad-hoc, без notarization. / Open the DMG and drag the app to
-Applications. macOS 13+ deployment baseline; ad-hoc signed, not notarized.
-
-Выберите сетевой интерфейс → **Сканировать**. Результаты появляются постепенно;
-**Стоп** отменяет работу. / Select an interface → **Scan**. Hosts appear
-progressively; **Stop** cancels work.
-
-Язык по умолчанию: русская система → русский, остальные → английский.
-System / English / Русский можно выбрать вручную; выбор сохраняется.
-/ Russian system locale defaults to Russian; all others to English. A saved
-System / English / Русский override is available.
+<!-- macos-release -->
+macOS 1.4.0: сборка, проверка и публикация выполняются отдельно на Mac. В этом релизе Windows/Linux поставка Mac пока отсутствует. / macOS 1.4.0 will be built, tested and published independently on Mac; its package is not included yet.
+<!-- /macos-release -->
 
 ## Возможности / Features
 
-- ARP, ICMP и TCP discovery с выбранного интерфейса; асинхронные DNS/NetBIOS,
-  MAC и встроенная база производителей. / Selected-interface discovery,
-  asynchronous naming, MAC and embedded vendor lookup.
-- Один узел, common/custom TCP-порты, сортировка, фильтр и подсказки ОС.
-  / Single Host, common/custom TCP ports, sorting, filtering and cautious OS hints.
-- Мониторинг ONLINE/OFFLINE/NEW/CHANGED/UNKNOWN, ограниченный журнал и история,
-  статистика, Ping/Trace и заметки устройства. / Monitoring, bounded session
-  logs/history, statistics, Ping/Trace and device notes.
-- UTF-8 профили, фоновый атомарный CSV/TXT/HTML export.
-  / UTF-8 profiles and background atomic CSV/TXT/HTML export.
-- Native Win32 / GTK3 / Cocoa; переносимое C17 core. Все сборки локальные:
-  Windows/Linux на Windows, macOS на Mac. GitHub Actions только запускает
-  готовые ARM64 файлы; не компилирует. / Local compilation, with runtime-only
-  ARM64 verification on GitHub.
+- ARP/ICMP/TCP discovery, DNS/NetBIOS, MAC/IEEE OUI, TCP-порты, вероятностная ОС. / Discovery, names, vendor lookup, TCP ports and cautious OS hints.
+- Мониторинг, NEW/CHANGED/OFFLINE, Ping/Trace, история, журнал, фильтр, сортировка и экспорт CSV/TXT/HTML. / Monitoring, host changes, diagnostics, history, log, filtering, sorting and export.
+- По умолчанию русский для русской системы, английский для остальных; ручной выбор System/English/Русский. / Russian for Russian systems, English otherwise; an explicit language override is available.
 
-ARP-кэш сам по себе не доказывает ONLINE; определение ОС вероятностное.
-Заметки и история устройств — текущей сессии, заметки профиля сохраняются.
-Web/SSH/SMB/RDP используют установленные системные приложения. mDNS, активное
-IPv6-сканирование и история на диске остаются будущими функциями.
-/ Cached neighbors do not prove ONLINE; OS hints are probabilistic. Device
-notes/history are session-only, profile notes persist. External actions use
-installed system applications. mDNS, active IPv6 and disk history remain future work.
+- Windows: Вид → Тема → Системная / Светлая / Тёмная. По умолчанию используется тема Windows; выбор сохраняется только после сохранения профиля. / View → Theme → System / Light / Dark. Defaults to Windows appearance; the preference persists only after saving a profile.
 
-## Реальные скриншоты / Actual screenshots
+## Временный запуск и профиль / Temporary use and profiles
 
-Окончательные сборки 1.3.2 после реального LAN-сканирования, без демонстрационных
-данных. / Final 1.3.2 builds after actual LAN scans, without sample data.
+Просто запустите приложение и сканируйте: INI и каталоги настроек не создаются. Успешное «Сохранить профиль» включает постоянный режим. Профили находятся в `profiles` рядом с приложением; единственный профиль выбирается автоматически при запуске. В Windows при недоступной для записи папке используется `%LOCALAPPDATA%\Look@LAN-ng\profiles`.
 
-IP-адреса на скриншотах скрыты размытием. / IP addresses in screenshots are blurred.
+Just launch and scan: no INI or settings directories are created. Successfully saving a profile enables persistent mode. Profiles live in `profiles` beside the application; a sole profile is selected automatically at startup. Windows can fall back to `%LOCALAPPDATA%\Look@LAN-ng\profiles` when the portable folder is not writable.
 
-**Windows, RU**
+Профиль v2: настройки `.lanprofile` и связанная история `.lanprofile.lanhistory`. Сохраняются хосты, MAC/имя, порты, первое/последнее обнаружение, отметки NEW/CHANGED и последние 10 000 событий. История продолжается при следующих сканированиях и мониторинге. Восстановленные строки имеют статус HISTORY/ИСТОРИЯ до новой проверки. Заметки устройств и отдельные Ping/Trace-пробы остаются в памяти текущего запуска. Старые профили v1 не поддерживаются; миграции нет.
 
-![Look@LAN-ng 1.3.2 on Windows](docs/images/windows-1.3.2.png)
+Profile v2 consists of `.lanprofile` settings and an associated `.lanprofile.lanhistory` snapshot. Hosts, MAC/name, ports, first/last seen, NEW/CHANGED flags and the latest 10,000 events persist across scans and monitoring sessions. Restored rows show HISTORY until checked again. Device notes and individual Ping/Trace samples remain session-only. Legacy v1 profiles are unsupported; no migration is performed.
+
+## Скриншоты / Screenshots
+
+Финальные сборки после реального LAN-сканирования; IP и MAC скрыты размытием. / Final builds after actual LAN scans; IP and MAC addresses are blurred.
+
+**Windows, RU, тёмная тема / dark theme**
+
+![Look@LAN-ng 1.4.0 Windows](docs/images/windows-1.4.0.png)
 
 **Ubuntu, EN**
 
-![Look@LAN-ng 1.3.2 on Ubuntu](docs/images/linux-1.3.2.png)
+![Look@LAN-ng 1.4.0 Ubuntu](docs/images/linux-1.4.0.png)
 
-**macOS, RU**
+## Сборка и проверки / Build and validation
 
-![Look@LAN-ng 1.3.2 on macOS](docs/images/macos-1.3.2-ru.png)
+Windows и Linux компилируются локально на Windows. Перед каждой сборкой официально проверяется и используется последний stable Clang/LLVM-MinGW и заново загружается база IEEE MA-L. Ошибка проверки останавливает сборку. Максимальное сжатие stable UPX: `--ultra-brute --lzma`, затем integrity и запуск. Несжатые диагностические файлы остаются локально.
 
-[macOS English screenshot](docs/images/macos-1.3.2-en.png)
+Windows and Linux are compiled locally on Windows. Every build verifies the latest official stable Clang/LLVM-MinGW and refreshes IEEE MA-L data; failed checks stop the build. Stable UPX uses maximum compression followed by integrity and startup checks; raw diagnostic binaries stay local. Actions only validates prebuilt ARM64 binaries, without compilation.
 
-## Проверки и ограничения / Validation and limits
+Runtime coverage: Windows 11 x64, native Windows 11 ARM64 runner and the supplied Ubuntu 26.04.1 x64 VM. Full Windows 10/11, physical DPI/NIC and older Ubuntu hardware matrices are not claimed. macOS 1.4.0 native validation is pending on Mac. [Evidence](docs/VALIDATION_1.4.0.md).
 
-Windows x86/x64: по 15 CTest и четыре packed smoke modes на Windows 11 x64.
-ARM64: 11 локально скомпилированных C suites и четыре packed smoke modes
-на нативном Windows 11 ARM64 [runner](https://github.com/nr084/Look-LAN-ng/actions/runs/38566307932).
-UPX 5.2.1, `--ultra-brute --lzma`, integrity и запуск проверены.
-
-Linux: шесть native C suites, 39 GTK workflows и packed startup на Ubuntu VM.
-100 Scan/Stop cycles: FD 6 → 6, максимальный Stop 12 ms. Ubuntu 22.04 runtime,
-physical HiDPI/NIC unplug и длительная матрица не проверены.
-
-macOS: native arm64 и Rosetta x86_64 suites, подписанный app smoke, Cocoa GUI,
-реальный LAN scan и DMG проверки на Apple Silicon. Intel hardware и старые
-macOS не проверены. UPX не поддерживает Mach-O; DMG сжат ULMO/LZMA.
-
-These checks cover the stated environments, not a complete Windows 10/11,
-physical DPI/NIC or long-runtime matrix. Rosetta results do not replace Intel
-hardware testing. See [Windows/Linux 1.3.2 validation](docs/WINDOWS_LINUX_VALIDATION_1.3.2.md)
-and [macOS validation](docs/MACOS_VALIDATION.md) for exact evidence and limits.
-
-© nr084 — год copyright вычисляется при сборке / copyright year generated at build time.
+© nr084 — год вычисляется при сборке / year generated at build time.

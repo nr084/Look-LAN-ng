@@ -6,10 +6,12 @@
 #include "profile.h"
 #include "statistics.h"
 #include "win_files.h"
+#include "../history_store.h"
 #include "win_profile_ui.h"
 #include "details.h"
 #include "win_tools.h"
 #include "win_toolbar_icons.h"
+#include "win_theme.h"
 #include "../../resources/resource.h"
 #include <commctrl.h>
 #include <shellapi.h>
@@ -54,6 +56,9 @@
 #define ID_SSH 157
 #define ID_NOTES 158
 #define ID_SYSTEM_LANGUAGE 159
+#define ID_THEME_SYSTEM 160
+#define ID_THEME_LIGHT 161
+#define ID_THEME_DARK 162
 #define HOST_CAPACITY 65536
 #define LOG_CAPACITY 10000
 typedef struct {
@@ -73,6 +78,8 @@ typedef struct {
     lan_host_t hosts[HOST_CAPACITY];
     size_t host_count;
     wchar_t ini[MAX_PATH];
+    bool persistent,history_dirty,history_loading,history_pending,history_blocked;
+    char history_path[4096];history_store_t *history_job;ULONGLONG history_due;
     wchar_t filter_text[128];
     vendor_table_t vendors;
     monitor_t model;
@@ -98,6 +105,10 @@ typedef struct {
 static app_t app;
 static void load_profile_path(const wchar_t *path);
 static void save_settings(void);
+static void history_tick(void);
+static bool history_close_ready(void);
+static void history_save(void);
+static void history_attach(void);
 static bool language_is_russian(const wchar_t *preference, LANGID system) {
     if (!wcscmp(preference,L"ru")) return true;
     if (!wcscmp(preference,L"en")) return false;
@@ -127,6 +138,7 @@ static void set_font(void) {
     HWND controls[] = {app.toolbar,app.tree,app.list,app.tabs,app.detail,app.status,app.summary,app.filter,app.log_view,app.statistics_view};
     for (unsigned i = 0; i < sizeof(controls)/sizeof(controls[0]); ++i) SendMessageW(controls[i], WM_SETFONT, (WPARAM)app.font, TRUE);
     if (old) DeleteObject(old);
+    win_theme_apply(app.window,app.font);
 }
 static void layout(void) {
     RECT r; GetClientRect(app.window, &r);
@@ -172,16 +184,16 @@ static void update_summary(void) {
 }
 static void update_status(void) {
     unsigned online = 0, offline = 0, fresh = 0;
-    for (size_t i = 0; i < app.host_count; ++i) { if (app.hosts[i].online) ++online; else if (app.hosts[i].first_seen) ++offline; if (app.hosts[i].new_device) ++fresh; }
+    for (size_t i = 0; i < app.host_count; ++i) { if (app.hosts[i].online && !app.hosts[i].historical) ++online; else if (app.hosts[i].first_seen && !app.hosts[i].historical) ++offline; if (app.hosts[i].new_device) ++fresh; }
     wchar_t text[256];
     double elapsed = app.scanning ? (double)(GetTickCount64() - app.started)/1000 : (double)app.elapsed/1000;
     swprintf_s(text, 256, L"%ls  |  %ls: %u  |  %ls: %u  |  %ls: %u  |  %ld/%u  |  %.1f s",
-        app.closing ? tr(L"Closing…",L"Завершение…") : app.scanning ? (app.backend.cancel ? tr(L"Stopping…",L"Остановка…") : tr(L"Scanning",L"Сканирование")) : app.tools_job ? (app.tools_trace ? tr(L"Tracing…",L"Трассировка…") : L"Ping…") : app.export_job ? tr(L"Exporting…",L"Экспорт…") : tr(L"Ready",L"Готово"),
+        app.closing ? tr(L"Closing…",L"Завершение…") : app.scanning ? (app.backend.cancel ? tr(L"Stopping…",L"Остановка…") : tr(L"Scanning",L"Сканирование")) : app.tools_job ? (app.tools_trace ? tr(L"Tracing…",L"Трассировка…") : L"Ping…") : app.export_job ? tr(L"Exporting…",L"Экспорт…") : (app.history_loading || app.history_pending) ? tr(L"Loading history…",L"Загрузка истории…") : tr(L"Ready",L"Готово"),
         tr(L"Online",L"В сети"), online, tr(L"Offline",L"Не в сети"), offline, tr(L"New",L"Новые"), fresh, app.generation ? app.backend.completed : 0, app.generation ? app.backend.total : 0, elapsed);
     SendMessageW(app.status, SB_SETTEXTW, 0, (LPARAM)text);
     SendMessageW(app.progress, PBM_SETRANGE32, 0, app.generation && app.backend.total ? app.backend.total : 1);
     SendMessageW(app.progress, PBM_SETPOS, app.generation ? app.backend.completed : 0, 0);
-    SendMessageW(app.toolbar, TB_ENABLEBUTTON, ID_SCAN, MAKELONG(!app.scanning && !app.tools_job && app.selected >= 0 && !app.closing,0));
+    SendMessageW(app.toolbar, TB_ENABLEBUTTON, ID_SCAN, MAKELONG(!app.scanning && !app.tools_job && !app.history_loading && !app.history_pending && app.selected >= 0 && !app.closing,0));
     SendMessageW(app.toolbar, TB_ENABLEBUTTON, ID_STOP, MAKELONG((app.scanning && !app.backend.cancel) || app.monitoring || app.tools_job,0));
     SendMessageW(app.toolbar, TB_ENABLEBUTTON, ID_REFRESH, MAKELONG(!app.scanning && !app.closing && !app.monitoring,0));
     SendMessageW(app.toolbar, TB_ENABLEBUTTON, ID_SINGLE, MAKELONG(!app.scanning && app.selected >= 0 && !app.closing,0));
@@ -200,7 +212,7 @@ static void update_status(void) {
 static void row_text(const lan_host_t *h, int col, wchar_t *s, size_t cap) {
     s[0] = 0;
     switch (col) {
-    case 0: swprintf_s(s,cap,L"%ls", !h->first_seen ? tr(L"UNKNOWN",L"НЕИЗВЕСТНО") : !h->online ? tr(L"OFFLINE",L"НЕ В СЕТИ") : h->new_device ? tr(L"NEW",L"НОВОЕ") : h->changed ? tr(L"CHANGED",L"ИЗМЕНЕНО") : tr(L"ONLINE",L"В СЕТИ")); break;
+    case 0: swprintf_s(s,cap,L"%ls", h->historical ? tr(L"HISTORY",L"ИСТОРИЯ") : !h->first_seen ? tr(L"UNKNOWN",L"НЕИЗВЕСТНО") : !h->online ? tr(L"OFFLINE",L"НЕ В СЕТИ") : h->new_device ? tr(L"NEW",L"НОВОЕ") : h->changed ? tr(L"CHANGED",L"ИЗМЕНЕНО") : tr(L"ONLINE",L"В СЕТИ")); break;
     case 1: ip_text(ipv4_value(&h->address),s,cap); break;
     case 2: if (h->hostname[0]) utf8_text(h->hostname,s,(int)cap); else swprintf_s(s,cap,L"%ls",tr(L"<unknown>",L"<неизвестно>")); break;
     case 3: if (h->has_mac) swprintf_s(s,cap,L"%02X:%02X:%02X:%02X:%02X:%02X",h->mac[0],h->mac[1],h->mac[2],h->mac[3],h->mac[4],h->mac[5]); break;
@@ -249,7 +261,7 @@ static void update_row(size_t index) {
     int row = row_for(index);
     if (!matches_filter(&app.hosts[index])) { if (row >= 0) ListView_DeleteItem(app.list,row); return; }
     LVITEMW item = {0}; item.mask = LVIF_TEXT | LVIF_PARAM | LVIF_IMAGE; item.iItem = row < 0 ? ListView_GetItemCount(app.list) : row;
-    item.lParam = (LPARAM)index; item.iImage = app.hosts[index].online ? 0 : 1;
+    item.lParam = (LPARAM)index; item.iImage = app.hosts[index].online && !app.hosts[index].historical ? 0 : 1;
     wchar_t text[512]; row_text(&app.hosts[index],0,text,512); item.pszText = text;
     if (row < 0) row = ListView_InsertItem(app.list,&item); else ListView_SetItem(app.list,&item);
     for (int c = 1; c < 10; ++c) { row_text(&app.hosts[index],c,text,512); ListView_SetItemText(app.list,row,c,text); }
@@ -387,6 +399,10 @@ static void create_menu(void) {
     AppendMenuW(language,MF_STRING | (!app.system_language && !app.russian ? MF_CHECKED : 0),ID_EN,L"English");
     AppendMenuW(language,MF_STRING | (!app.system_language && app.russian ? MF_CHECKED : 0),ID_RU,L"Русский");
     AppendMenuW(view,MF_POPUP,(UINT_PTR)language,tr(L"&Language",L"&Язык"));
+    HMENU theme=CreatePopupMenu();const wchar_t *themes[]={tr(L"System (default)",L"Системная (по умолчанию)"),tr(L"Light",L"Светлая"),tr(L"Dark",L"Тёмная")};
+    for(unsigned i=0;i<3;++i)AppendMenuW(theme,MF_STRING,ID_THEME_SYSTEM+i,themes[i]);
+    CheckMenuRadioItem(theme,ID_THEME_SYSTEM,ID_THEME_DARK,ID_THEME_SYSTEM+win_theme_mode(),MF_BYCOMMAND);
+    AppendMenuW(view,MF_POPUP,(UINT_PTR)theme,tr(L"&Theme",L"&Тема"));
     for (unsigned i = 0; i < 5; ++i) { wchar_t label[64]; swprintf_s(label,64,L"%u %ls",intervals[i],tr(L"seconds",L"секунд")); AppendMenuW(interval,MF_STRING | (app.monitor_interval == intervals[i] ? MF_CHECKED : 0),ID_INTERVAL_FIRST+i,label); }
     AppendMenuW(view,MF_POPUP,(UINT_PTR)interval,tr(L"Monitoring &interval",L"&Интервал мониторинга"));
     AppendMenuW(help,MF_STRING,ID_ABOUT,tr(L"&About",L"&О программе"));
@@ -394,7 +410,7 @@ static void create_menu(void) {
     AppendMenuW(menu,MF_POPUP,(UINT_PTR)scan,tr(L"&Scan",L"&Сканирование"));
     AppendMenuW(menu,MF_POPUP,(UINT_PTR)view,tr(L"&View",L"&Вид"));
     AppendMenuW(menu,MF_POPUP,(UINT_PTR)help,tr(L"&Help",L"&Справка"));
-    SetMenu(app.window,menu); if (old) DestroyMenu(old); DrawMenuBar(app.window);
+    win_theme_menu(menu,true);SetMenu(app.window,menu); if (old) win_theme_destroy_menu(old); DrawMenuBar(app.window);win_theme_menu_edge(app.window,NULL);
 }
 static void localize(void) {
     create_menu();
@@ -416,7 +432,31 @@ static void localize(void) {
     for (size_t i = 0; i < app.host_count; ++i) update_row(i);
     update_summary(); update_status(); show_detail(); layout();
 }
+static void history_attach(void) {
+    app.history_path[0]=0;app.history_blocked=false;
+    if(!app.profile_path[0] || app.selected<0 || app.smoke)return;
+    char path[4000];if(!WideCharToMultiByte(CP_UTF8,0,app.profile_path,-1,path,sizeof(path),NULL,NULL))return;
+    snprintf(app.history_path,sizeof(app.history_path),"%s.lanhistory",path);
+    app.history_pending=history_store_exists(app.history_path);app.history_due=GetTickCount64();
+}
+static void history_save(void) {
+    if(app.smoke || !app.persistent || !app.history_path[0] || app.history_blocked || app.history_pending || app.history_job || !app.history_dirty)return;
+    app.history_job=history_store_start(app.history_path,&app.profile,&app.model,false,0);app.history_loading=false;
+    if(app.history_job){app.history_dirty=false;app.history_due=GetTickCount64()+5000;}
+}
+static void history_tick(void) {
+    if(app.history_job && history_store_done(app.history_job)){
+        bool ok=history_store_success(app.history_job);
+        if(app.history_loading && ok){history_store_apply(app.history_job,&app.model);app.history_loading=false;for(size_t i=0;i<app.host_count;++i)update_row(i);sync_log(true);show_detail();update_status();}
+        if(!ok){app.history_blocked=true;MessageBoxW(app.window,tr(L"History could not be read or saved. Existing history was preserved; automatic writes are disabled for this session.",L"Не удалось прочитать или сохранить историю. Существующий файл сохранён; автоматическая запись в этой сессии отключена."),L"Look@LAN-ng",MB_ICONWARNING);}
+        history_store_free(app.history_job);app.history_job=NULL;app.history_loading=false;
+    }
+    if(!app.history_job && app.history_pending){app.history_job=history_store_start(app.history_path,&app.profile,&app.model,true,app.interfaces[app.selected].index);app.history_loading=app.history_job!=NULL;app.history_pending=false;if(!app.history_job)app.history_blocked=true;}
+    if(!app.scanning && !app.closing && GetTickCount64()>=app.history_due)history_save();
+}
+static bool history_close_ready(void){history_tick();history_save();return !app.history_job && !app.history_pending;}
 static void reset_session(void) {
+    app.history_path[0]=0;app.history_pending=false;app.history_dirty=false;app.history_blocked=false;
     ++app.session; win_tools_cancel(app.tools_job); details_reset(&app.details); app.trace_count = 0; app.trace_target = 0;
     app.generation = 0; app.has_monitor_range = false;
     app.started = app.elapsed = 0;
@@ -440,7 +480,7 @@ static void populate_saved_profiles(void) {
     TreeView_Expand(app.tree,app.profile_root,TVE_EXPAND); app.loading_tree = previous;
 }
 static void enumerate(void) {
-    if (app.scanning || app.monitoring) return;
+    if (app.scanning || app.monitoring || app.history_job || app.history_pending) return;
     app.selected = -1; app.loading_tree = true; TreeView_DeleteAllItems(app.tree); app.profile_root = NULL; app.loading_tree = false;
     DWORD error = win_enumerate(app.interfaces,MAX_INTERFACES,&app.interface_count);
     if (error) { wchar_t msg[128]; swprintf_s(msg,128,L"%ls (%lu)",tr(L"Cannot enumerate interfaces",L"Не удалось получить интерфейсы"),error); MessageBoxW(app.window,msg,L"Look@LAN-ng",MB_ICONWARNING); }
@@ -456,7 +496,12 @@ static void enumerate(void) {
         if (app.custom_profile && app.profile.interface_id[0]) { if (!strcmp(v->id,app.profile.interface_id)) selected = child; }
         else if (v->automatic && (!selected || v->metric < best)) { selected = child; best = v->metric; }
     }
-    if (selected) TreeView_SelectItem(app.tree,selected);
+    if (selected) {
+        TVITEMW item={0};item.mask=TVIF_PARAM;item.hItem=selected;TreeView_GetItem(app.tree,&item);
+        app.selected=(int)item.lParam;app.loading_tree=true;TreeView_SelectItem(app.tree,selected);app.loading_tree=false;
+        for(size_t i=0;i<app.host_count;++i)app.hosts[i].interface_index=app.interfaces[app.selected].index;
+        bind_profile_interface();
+    }
     populate_saved_profiles();
     update_summary(); update_status();
 }
@@ -476,7 +521,7 @@ static bool confirm_large_scan(const wchar_t *text) {
     app.dialog_open = false; return answer == IDYES;
 }
 static void begin_scan(void) {
-    if (app.scanning || app.tools_job || app.closing || app.selected < 0) return;
+    if (app.scanning || app.tools_job || app.closing || app.history_pending || app.history_loading || app.selected < 0) return;
     char error[128]; if (!profile_validate(&app.profile,error,sizeof(error))) { MessageBoxW(app.window,tr(L"Configure a valid scan profile first.",L"Сначала настройте корректный профиль сканирования."),L"Look@LAN-ng",MB_ICONWARNING); return; }
     uint64_t total; if (!ranges_normalize(app.profile.ranges,&app.profile.range_count,&total)) return;
     if (total > INT32_MAX) { MessageBoxW(app.window,tr(L"The selected ranges are too large. Reduce them in the profile.",L"Выбранные диапазоны слишком велики. Уменьшите их в профиле."),L"Look@LAN-ng",MB_ICONWARNING); return; }
@@ -505,6 +550,7 @@ static void monitoring_tick(void) {
 }
 typedef struct { const wchar_t *title, *prompt; wchar_t *text; int capacity; } input_dialog_t;
 static INT_PTR CALLBACK input_proc(HWND dialog, UINT message, WPARAM w, LPARAM l) {
+    LRESULT themed;if(win_theme_message(dialog,message,w,l,&themed))return (INT_PTR)themed;
     input_dialog_t *input = (input_dialog_t *)GetWindowLongPtrW(dialog,DWLP_USER);
     if (message == WM_INITDIALOG) {
         input = (input_dialog_t *)l; SetWindowLongPtrW(dialog,DWLP_USER,l);
@@ -527,7 +573,7 @@ static bool input_box(const wchar_t *title, const wchar_t *prompt, wchar_t *text
     app.dialog_open = false; return accepted;
 }
 static void single_scan(bool selected, bool custom) {
-    if (app.scanning || app.tools_job || app.closing || app.selected < 0) return;
+    if (app.scanning || app.tools_job || app.closing || app.history_pending || app.history_loading || app.selected < 0) return;
     wchar_t target[256] = L"";
     size_t index = selected ? selected_host() : SIZE_MAX;
     if (index != SIZE_MAX) ip_text(ipv4_value(&app.hosts[index].address),target,256);
@@ -559,20 +605,20 @@ static void profile_error(const wchar_t *action, const char *detail) {
     swprintf_s(message,512,L"%ls (%lu)\n%ls",action,error,extra); MessageBoxW(app.window,message,L"Look@LAN-ng",MB_ICONWARNING);
 }
 static void load_profile_path(const wchar_t *path) {
-    if (app.scanning || app.monitoring || app.closing) return;
+    if (app.scanning || app.monitoring || app.closing || app.history_job || app.history_pending) return;
     profile_t *candidate = malloc(sizeof(*candidate)); if (!candidate) return;
     char error[256] = "";
     if (!win_profile_load(path,candidate,error,sizeof(error))) { free(candidate); profile_error(tr(L"Cannot load profile",L"Не удалось загрузить профиль"),error); return; }
     int selected = app.selected;
     if (candidate->interface_id[0]) { selected = -1; for (size_t i = 0; i < app.interface_count; ++i) if (!strcmp(candidate->interface_id,app.interfaces[i].id)) { selected = (int)i; break; } }
-    app.profile = *candidate; free(candidate); app.custom_profile = true; app.monitor_interval = app.profile.monitor_interval_sec; app.selected = selected;
-    wcscpy_s(app.profile_path,MAX_PATH,path); reset_session();
+    history_save();app.profile = *candidate; free(candidate); app.custom_profile = true; app.monitor_interval = app.profile.monitor_interval_sec; app.selected = selected;
+    reset_session(); wcscpy_s(app.profile_path,MAX_PATH,path); app.persistent=true;
     app.loading_tree = true; TreeView_SelectItem(app.tree,selected >= 0 ? app.interface_items[selected] : NULL); app.loading_tree = false;
-    bind_profile_interface(); localize();
+    bind_profile_interface(); history_attach(); localize();
     if (selected < 0) MessageBoxW(app.window,tr(L"The saved interface is unavailable. Select a network interface before scanning.",L"Сохранённый адаптер недоступен. Выберите сетевой интерфейс перед сканированием."),L"Look@LAN-ng",MB_ICONINFORMATION);
 }
 static void profile_command(int command) {
-    if (app.closing || ((command != ID_PROFILE_SAVE) && (app.scanning || app.monitoring))) return;
+    if (app.closing || app.history_job || app.history_pending || ((command != ID_PROFILE_SAVE) && (app.scanning || app.monitoring))) return;
     if (command == ID_PROFILE_OPEN) {
         wchar_t path[MAX_PATH] = L""; app.dialog_open = true; bool accepted = win_profile_file_dialog(app.window,false,app.russian,path); app.dialog_open = false;
         if (accepted) load_profile_path(path); return;
@@ -581,12 +627,12 @@ static void profile_command(int command) {
         profile_t *candidate = malloc(sizeof(*candidate)); if (!candidate) return; profile_defaults(candidate); candidate->monitor_interval_sec = app.monitor_interval;
         if (app.selected >= 0) { network_range(app.interfaces[app.selected].ip,app.interfaces[app.selected].prefix,&candidate->ranges[0]); candidate->range_count = 1; }
         app.dialog_open = true; bool accepted = win_profile_edit(app.window,app.russian,candidate); app.dialog_open = false;
-        if (accepted) { app.profile = *candidate; app.custom_profile = true; app.profile_path[0] = 0; app.monitor_interval = app.profile.monitor_interval_sec; bind_profile_interface(); reset_session(); localize(); }
+        if (accepted) { history_save();app.profile = *candidate; app.custom_profile = true; app.profile_path[0] = 0; app.monitor_interval = app.profile.monitor_interval_sec; bind_profile_interface(); reset_session(); localize(); }
         free(candidate); return;
     }
     if (command == ID_PROFILE_EDIT) {
         app.dialog_open = true; bool changed = win_profile_edit(app.window,app.russian,&app.profile); app.dialog_open = false;
-        if (changed) { app.custom_profile = true; app.monitor_interval = app.profile.monitor_interval_sec; bind_profile_interface(); reset_session(); localize(); }
+        if (changed) { app.custom_profile = true; app.monitor_interval = app.profile.monitor_interval_sec; bind_profile_interface(); localize(); }
         return;
     }
     if (command == ID_PROFILE_SAVE) {
@@ -599,8 +645,9 @@ static void profile_command(int command) {
         }
         app.dialog_open = true; bool accepted = win_profile_file_dialog(app.window,true,app.russian,path); app.dialog_open = false;
         if (!accepted) return;
+        if(app.history_blocked && !_wcsicmp(path,app.profile_path)){MessageBoxW(app.window,tr(L"Existing history is unreadable. Save under a different profile name to preserve it.",L"Существующая история недоступна. Сохраните под другим именем профиля, чтобы не повредить её."),L"Look@LAN-ng",MB_ICONWARNING);return;}
         if (!win_profile_save(path,&app.profile)) { profile_error(tr(L"Cannot save profile",L"Не удалось сохранить профиль"),NULL); return; }
-        wcscpy_s(app.profile_path,MAX_PATH,path); populate_saved_profiles();
+        wcscpy_s(app.profile_path,MAX_PATH,path); app.persistent=true;history_attach();app.history_pending=false;app.history_dirty=true;history_save();save_settings();populate_saved_profiles();
     }
 }
 static void export_hosts(report_format_t format) {
@@ -626,11 +673,11 @@ static void export_menu(void) {
     if (app.export_job || app.closing) return;
     HMENU menu = CreatePopupMenu(); AppendMenuW(menu,MF_STRING,ID_EXPORT_CSV,L"CSV"); AppendMenuW(menu,MF_STRING,ID_EXPORT_TXT,L"TXT"); AppendMenuW(menu,MF_STRING,ID_EXPORT_HTML,L"HTML");
     RECT r; SendMessageW(app.toolbar,TB_GETRECT,ID_EXPORT_MENU,(LPARAM)&r); MapWindowPoints(app.toolbar,NULL,(POINT *)&r,2);
-    int action = TrackPopupMenu(menu,TPM_RETURNCMD|TPM_RIGHTBUTTON,r.left,r.bottom,0,app.window,NULL); DestroyMenu(menu); if (action) SendMessageW(app.window,WM_COMMAND,action,0);
+    win_theme_menu(menu,false);int action = TrackPopupMenu(menu,TPM_RETURNCMD|TPM_RIGHTBUTTON,r.left,r.bottom,0,app.window,NULL); win_theme_destroy_menu(menu); if (action) SendMessageW(app.window,WM_COMMAND,action,0);
 }
 static void paint_statistics(const DRAWITEMSTRUCT *draw) {
-    HDC dc = draw->hDC; RECT area = draw->rcItem; FillRect(dc,&area,(HBRUSH)GetStockObject(WHITE_BRUSH));
-    HGDIOBJ old = SelectObject(dc,app.font); SetBkMode(dc,TRANSPARENT); SetTextColor(dc,GetSysColor(COLOR_WINDOWTEXT));
+    HDC dc = draw->hDC; RECT area = draw->rcItem; FillRect(dc,&area,win_theme_brush(THEME_SURFACE));
+    HGDIOBJ old = SelectObject(dc,app.font); SetBkMode(dc,TRANSPARENT); SetTextColor(dc,win_theme_color(THEME_TEXT));
     statistics_t s = statistics_compute(app.hosts,app.host_count,app.generation ? (uint32_t)app.backend.completed : 0);
     const wchar_t *left[] = {tr(L"Scanned addresses",L"Проверено адресов"),tr(L"Online",L"В сети"),tr(L"Offline",L"Не в сети"),tr(L"New",L"Новые"),tr(L"Unconfirmed",L"Неподтверждённые")};
     const wchar_t *right[] = {tr(L"Table records",L"Узлов в таблице"),L"Windows",L"Linux / Unix",tr(L"Network devices",L"Сетевые устройства"),tr(L"Unknown OS (online)",L"Неизвестная ОС (в сети)")};
@@ -641,7 +688,7 @@ static void paint_statistics(const DRAWITEMSTRUCT *draw) {
         swprintf_s(text,256,L"%ls: %zu",left[i],values[i]); DrawTextW(dc,text,-1,&r,DT_LEFT|DT_SINGLELINE|DT_END_ELLIPSIS|DT_NOPREFIX);
         r.left = middle+px(8); r.right = area.right-px(8); swprintf_s(text,256,L"%ls: %zu",right[i],os[i]); DrawTextW(dc,text,-1,&r,DT_LEFT|DT_SINGLELINE|DT_END_ELLIPSIS|DT_NOPREFIX);
         if (i >= 1 && i <= 3) {
-            RECT bar = {area.left+px(8),y+px(18),middle-px(12),y+px(21)}; FillRect(dc,&bar,(HBRUSH)GetStockObject(LTGRAY_BRUSH));
+            RECT bar = {area.left+px(8),y+px(18),middle-px(12),y+px(21)}; FillRect(dc,&bar,win_theme_brush(THEME_BORDER));
             bar.right = bar.left+(int)((uint64_t)(middle-px(12)-bar.left)*values[i]/(s.records ? s.records : 1));
             HBRUSH color = CreateSolidBrush(i == 1 ? RGB(35,148,87) : i == 2 ? RGB(140,148,157) : RGB(50,114,200)); FillRect(dc,&bar,color); DeleteObject(color);
         }
@@ -685,7 +732,7 @@ static void host_action(int action) {
     if (action == ID_COPY_NAME) { utf8_text(app.hosts[index].hostname,target,512); copy_text(target); return; }
     if (action == ID_COPY_MAC) { row_text(&app.hosts[index],3,target,512); copy_text(target); return; }
     if (action == ID_PROPERTIES) { TabCtrl_SetCurSel(app.tabs,0); show_detail(); SetFocus(app.detail); return; }
-    if (action == ID_ACKNOWLEDGE) { monitor_acknowledge(&app.model,index); update_row(index); show_detail(); update_status(); return; }
+    if (action == ID_ACKNOWLEDGE) { monitor_acknowledge(&app.model,index);app.history_dirty=true; update_row(index); show_detail(); update_status(); return; }
     if (action == ID_NOTES) {
         wchar_t note[512]; utf8_text(details_note(&app.details,ipv4_value(&app.hosts[index].address),app.hosts[index].interface_index),note,512);
         if (input_box(tr(L"Device notes (session)",L"Заметки устройства (сессия)"),tr(L"Notes, up to 511 UTF-8 bytes:",L"Заметки, до 511 байт UTF-8:"),note,512)) {
@@ -735,14 +782,15 @@ static void context_menu(POINT point) {
     AppendMenuW(menu,MF_SEPARATOR,0,NULL);
     AppendMenuW(menu,MF_STRING,ID_COPY_IP,tr(L"Copy IP",L"Копировать IP")); AppendMenuW(menu,MF_STRING,ID_COPY_NAME,tr(L"Copy Hostname",L"Копировать имя узла")); AppendMenuW(menu,MF_STRING,ID_COPY_MAC,tr(L"Copy MAC",L"Копировать MAC"));
     AppendMenuW(menu,MF_STRING,ID_PROPERTIES,tr(L"Properties",L"Свойства"));
-    int action = TrackPopupMenu(menu,TPM_RETURNCMD|TPM_RIGHTBUTTON,point.x,point.y,0,app.window,NULL); DestroyMenu(menu);
+    win_theme_menu(menu,false);int action = TrackPopupMenu(menu,TPM_RETURNCMD|TPM_RIGHTBUTTON,point.x,point.y,0,app.window,NULL); DestroyMenu(menu);
     if (action) SendMessageW(app.window,WM_COMMAND,(WPARAM)action,0);
 }
 static void drain_events(void) {
+    history_tick();
     net_event_t event; bool changed = false;
     if (!win_event_pop(&app.backend,&event)) {
         if (app.scanning || app.closing || app.monitoring) update_status();
-        if (app.closing && !app.tools_job && !app.export_job && win_backend_release(&app.backend)) DestroyWindow(app.window);
+        if (app.closing && !app.tools_job && !app.export_job && history_close_ready() && win_backend_release(&app.backend)) DestroyWindow(app.window);
         return;
     }
     SendMessageW(app.list,WM_SETREDRAW,FALSE,0);
@@ -770,9 +818,9 @@ static void drain_events(void) {
     }
     SendMessageW(app.list,WM_SETREDRAW,TRUE,0);
     sync_log(false);
-    if (changed) { InvalidateRect(app.list,NULL,FALSE); show_detail(); }
+    if (changed) { app.history_dirty=true; InvalidateRect(app.list,NULL,FALSE); show_detail(); }
     update_status();
-    if (app.closing && !app.tools_job && !app.export_job && win_backend_release(&app.backend)) DestroyWindow(app.window);
+    if (app.closing && !app.tools_job && !app.export_job && history_close_ready() && win_backend_release(&app.backend)) DestroyWindow(app.window);
 }
 static void settings_path(void) {
     GetModuleFileNameW(NULL,app.ini,MAX_PATH);
@@ -785,7 +833,7 @@ static void settings_path(void) {
     }
 }
 static void save_settings(void) {
-    if (app.smoke) return;
+    if (app.smoke || !app.persistent) return;
     const wchar_t *language = app.system_language ? L"system" : app.russian ? L"ru" : L"en";
     if (!WritePrivateProfileStringW(L"UI",L"Language",language,app.ini)) {
         DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA",app.ini,MAX_PATH);
@@ -795,6 +843,7 @@ static void save_settings(void) {
         if (!WritePrivateProfileStringW(L"UI",L"Language",language,app.ini)) return;
     }
     for (int i = 0; i < 10; ++i) { wchar_t key[32],value[32]; swprintf_s(key,32,L"Column%d",i); swprintf_s(value,32,L"%d",MulDiv(ListView_GetColumnWidth(app.list,i),96,(int)app.dpi)); WritePrivateProfileStringW(L"UI",key,value,app.ini); }
+    const wchar_t *theme=win_theme_mode()==WIN_THEME_DARK?L"dark":win_theme_mode()==WIN_THEME_LIGHT?L"light":L"system";WritePrivateProfileStringW(L"UI",L"Theme",theme,app.ini);
     wchar_t interval[32]; swprintf_s(interval,32,L"%u",app.monitor_interval); WritePrivateProfileStringW(L"UI",L"MonitorInterval",interval,app.ini);
 }
 static HIMAGELIST status_images(void) {
@@ -821,16 +870,21 @@ static HWND control(const wchar_t *class_name, DWORD style, DWORD extra) {
 }
 static bool dpi_smoke(void) {
     UINT initial = app.dpi; bool russian = app.russian;
+    win_theme_mode_t original_theme=win_theme_mode();
+    for(unsigned mode=0;mode<3;++mode){SendMessageW(app.window,WM_COMMAND,ID_THEME_SYSTEM+mode,0);if(win_theme_mode()!=(win_theme_mode_t)mode || ListView_GetBkColor(app.list)!=win_theme_color(THEME_SURFACE))return false;if(win_theme_dark())for(unsigned color=0;color<7;++color)win_theme_brush((win_theme_color_t)color);if(!win_profile_ui_smoke(app.window))return false;}
+    SendMessageW(app.window,WM_COMMAND,ID_THEME_SYSTEM+original_theme,0);
     RECT original; GetWindowRect(app.window,&original);
     DWORD gdi_before = GetGuiResources(GetCurrentProcess(),GR_GDIOBJECTS), user_before = GetGuiResources(GetCurrentProcess(),GR_USEROBJECTS);
     const UINT scales[] = {96,120,144,168,192};
     for (unsigned pass = 0; pass < 20; ++pass) for (size_t scale = 0; scale < 5; ++scale) {
+        SendMessageW(app.window,WM_COMMAND,ID_THEME_SYSTEM+(pass%3),0);
+        if(win_theme_mode()!=(win_theme_mode_t)(pass%3) || ListView_GetBkColor(app.list)!=win_theme_color(THEME_SURFACE))return false;
         UINT dpi = scales[scale]; app.russian = (pass & 1) != 0;
         RECT target = {0,0,MulDiv(pass & 2 ? 760 : 1100,(int)dpi,96),MulDiv(pass & 2 ? 520 : 700,(int)dpi,96)};
         SendMessageW(app.window,WM_DPICHANGED,MAKELONG(dpi,dpi),(LPARAM)&target); localize();
         HDC icon_dc = GetDC(app.toolbar);
         for (unsigned icon = 0; icon < 6; ++icon) for (unsigned enabled = 0; enabled < 2; ++enabled)
-            win_toolbar_icon(icon_dc,0,0,px(20),icon,enabled != 0,GetSysColor(COLOR_BTNFACE));
+            win_toolbar_icon(icon_dc,0,0,px(20),icon,enabled != 0,win_theme_color(THEME_PANEL));
         ReleaseDC(app.toolbar,icon_dc); InvalidateRect(app.toolbar,NULL,TRUE);
         HWND controls[] = {app.tree,app.list,app.tabs,app.filter,app.statistics_view};
         for (size_t i = 0; i < sizeof(controls)/sizeof(controls[0]); ++i) {
@@ -841,7 +895,7 @@ static bool dpi_smoke(void) {
         MapWindowPoints(app.toolbar,app.window,(POINT *)&button,2); GetWindowRect(app.filter,&filter); MapWindowPoints(NULL,app.window,(POINT *)&filter,2);
         if (filter.top < button.bottom && filter.left < button.right) return false;
     }
-    app.russian = russian; SendMessageW(app.window,WM_DPICHANGED,MAKELONG(initial,initial),(LPARAM)&original); localize();
+    SendMessageW(app.window,WM_COMMAND,ID_THEME_SYSTEM+original_theme,0);app.russian = russian; SendMessageW(app.window,WM_DPICHANGED,MAKELONG(initial,initial),(LPARAM)&original); localize();
     DWORD gdi_after = GetGuiResources(GetCurrentProcess(),GR_GDIOBJECTS), user_after = GetGuiResources(GetCurrentProcess(),GR_USEROBJECTS);
     return gdi_after <= gdi_before+2 && user_after <= user_before+2;
 }
@@ -867,10 +921,11 @@ static bool preview_bitmap(void) {
     SelectObject(dc,previous); DeleteObject(bitmap); DeleteDC(dc); return ok;
 }
 static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM l) {
+    LRESULT themed;if(win_theme_message(window,message,w,l,&themed))return themed;
     switch (message) {
     case WM_CREATE: {
         app.window = window; app.dpi = GetDpiForWindow(window); app.split = 225; app.bottom = 180; app.sort_direction = 1; app.sort_column = 1;
-        app.toolbar = control(TOOLBARCLASSNAMEW,WS_TABSTOP|TBSTYLE_TOOLTIPS|TBSTYLE_FLAT|TBSTYLE_LIST|CCS_NORESIZE|CCS_NOPARENTALIGN,0);
+        app.toolbar = control(TOOLBARCLASSNAMEW,WS_TABSTOP|TBSTYLE_TOOLTIPS|TBSTYLE_FLAT|TBSTYLE_LIST|CCS_NORESIZE|CCS_NOPARENTALIGN|CCS_NODIVIDER,0);
         SendMessageW(app.toolbar,TB_BUTTONSTRUCTSIZE,sizeof(TBBUTTON),0);
         const int ids[] = {ID_SCAN,ID_STOP,ID_REFRESH,ID_SINGLE,ID_MONITOR,ID_EXPORT_MENU};
         TBBUTTON buttons[6] = {0}; for (int i = 0; i < 6; ++i) { buttons[i].iBitmap = I_IMAGENONE; buttons[i].idCommand = ids[i]; buttons[i].fsState = TBSTATE_ENABLED; buttons[i].fsStyle = (i == 4 ? BTNS_CHECK : i == 5 ? BTNS_DROPDOWN : BTNS_BUTTON)|BTNS_AUTOSIZE|BTNS_SHOWTEXT; buttons[i].iString = (INT_PTR)L" "; }
@@ -894,10 +949,12 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM 
         app.status = control(STATUSCLASSNAMEW,SBARS_SIZEGRIP,0); app.progress = control(PROGRESS_CLASSW,0,0);
         if (!app.toolbar || !app.summary || !app.tree || !app.list || !app.tabs || !app.detail || !app.status || !app.progress || !app.filter || !app.log_view || !app.statistics_view) return -1;
         app.images = status_images(); ListView_SetImageList(app.list,app.images,LVSIL_SMALL);
-        set_font(); localize(); enumerate(); SetTimer(window,1,50,NULL);
+        set_font(); localize(); enumerate(); if(!app.smoke && app.saved_count==1) load_profile_path(app.saved_profiles[0].path); SetTimer(window,1,50,NULL);
         if (app.smoke) SetTimer(window,2,250,NULL);
         return 0;
     }
+    case WM_SETTINGCHANGE: case WM_THEMECHANGED: case WM_SYSCOLORCHANGE:
+        win_theme_set(win_theme_mode());if(app.window && app.toolbar){win_theme_apply(app.window,app.font);localize();}return 0;
     case WM_SIZE: layout(); return 0;
     case WM_DPICHANGED: {
         UINT old = app.dpi; app.dpi = HIWORD(w);
@@ -1013,6 +1070,8 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM 
         case ID_PING: start_tool(false); break;
         case ID_TRACE: start_tool(true); break;
         case ID_REFRESH: enumerate(); break;
+        case ID_THEME_SYSTEM: case ID_THEME_LIGHT: case ID_THEME_DARK:
+            win_theme_set((win_theme_mode_t)(LOWORD(w)-ID_THEME_SYSTEM));win_theme_apply(app.window,app.font);localize();save_settings();break;
         case ID_EN: app.system_language = false; app.russian = false; localize(); save_settings(); break;
         case ID_RU: app.system_language = false; app.russian = true; localize(); save_settings(); break;
         case ID_SYSTEM_LANGUAGE: app.system_language = true; app.russian = language_is_russian(L"system",GetUserDefaultUILanguage()); localize(); save_settings(); break;
@@ -1032,24 +1091,24 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM 
     case WM_CONTEXTMENU: if ((HWND)w == app.list) { POINT point = {(short)LOWORD(l),(short)HIWORD(l)}; context_menu(point); return 0; } break;
     case WM_NOTIFY: {
         NMHDR *n = (NMHDR *)l;
-        if (n->hwndFrom == app.tree && n->code == TVN_SELCHANGINGW && !app.loading_tree && (app.scanning || app.monitoring || app.closing)) return TRUE;
+        if (n->hwndFrom == app.tree && n->code == TVN_SELCHANGINGW && !app.loading_tree && (app.scanning || app.monitoring || app.closing || app.history_job || app.history_pending)) return TRUE;
         if (n->hwndFrom == app.toolbar && n->code == NM_CUSTOMDRAW) {
             NMCUSTOMDRAW *draw = (NMCUSTOMDRAW *)l;
-            if (draw->dwDrawStage == CDDS_PREPAINT) return CDRF_NOTIFYITEMDRAW;
+            if (draw->dwDrawStage == CDDS_PREPAINT) {FillRect(draw->hdc,&draw->rc,win_theme_brush(THEME_PANEL));return CDRF_NOTIFYITEMDRAW;}
             if (draw->dwDrawStage == CDDS_ITEMPREPAINT) {
                 wchar_t caption[128]; TBBUTTONINFOW info = {0}; info.cbSize = sizeof(info); info.dwMask = TBIF_TEXT|TBIF_STATE; info.pszText = caption; info.cchText = 128;
                 if (SendMessageW(app.toolbar,TB_GETBUTTONINFOW,draw->dwItemSpec,(LPARAM)&info) < 0) return CDRF_DODEFAULT;
                 int saved = SaveDC(draw->hdc); RECT rectangle = draw->rc;
                 bool enabled = (info.fsState & TBSTATE_ENABLED) != 0;
-                COLORREF background = GetSysColor(COLOR_BTNFACE);
-                FillRect(draw->hdc,&rectangle,GetSysColorBrush(COLOR_BTNFACE));
+                COLORREF background = win_theme_color(THEME_PANEL);
+                FillRect(draw->hdc,&rectangle,win_theme_brush(THEME_PANEL));
                 if (enabled && ((draw->uItemState & (CDIS_HOT|CDIS_SELECTED|CDIS_CHECKED)) || (info.fsState & TBSTATE_CHECKED))) {
-                    background = RGB(220,234,241); HBRUSH highlight = CreateSolidBrush(background); FillRect(draw->hdc,&rectangle,highlight); DeleteObject(highlight);
+                    background = win_theme_dark()?win_theme_color(THEME_HOVER):RGB(220,234,241); HBRUSH highlight = CreateSolidBrush(background); FillRect(draw->hdc,&rectangle,highlight); DeleteObject(highlight);
                 }
                 const int icon_ids[] = {ID_SCAN,ID_STOP,ID_REFRESH,ID_SINGLE,ID_MONITOR,ID_EXPORT_MENU};
                 for (unsigned i = 0; i < 6; ++i) if (draw->dwItemSpec == (DWORD_PTR)icon_ids[i]) win_toolbar_icon(draw->hdc,rectangle.left+px(8),rectangle.top+(rectangle.bottom-rectangle.top-px(20))/2,px(20),i,enabled,background);
                 SelectObject(draw->hdc,app.font); SetBkMode(draw->hdc,TRANSPARENT);
-                SetTextColor(draw->hdc,enabled ? GetSysColor(COLOR_BTNTEXT) : RGB(105,110,116));
+                SetTextColor(draw->hdc,enabled ? win_theme_color(THEME_TEXT) : win_theme_color(THEME_MUTED));
                 rectangle.left += px(34); rectangle.right -= px(draw->dwItemSpec == ID_EXPORT_MENU ? 24 : 10);
                 DrawTextW(draw->hdc,caption,-1,&rectangle,DT_SINGLELINE|DT_VCENTER|DT_CENTER|DT_NOPREFIX);
                 if (draw->dwItemSpec == ID_EXPORT_MENU) { RECT arrow = draw->rc; arrow.left = arrow.right-px(20); DrawTextW(draw->hdc,L"▾",1,&arrow,DT_SINGLELINE|DT_VCENTER|DT_CENTER); }
@@ -1069,7 +1128,7 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM 
             }
             if (selected >= 0 && (size_t)selected >= app.interface_count) selected = -1;
             if (selected != app.selected) {
-                app.selected = selected; reset_session(); bind_profile_interface(); update_summary(); update_status(); show_detail();
+                history_save();reset_session(); app.selected = selected; app.profile_path[0]=0;bind_profile_interface(); update_summary(); update_status(); show_detail();
             }
         }
         if (n->hwndFrom == app.list && (n->code == LVN_ITEMCHANGED || n->code == NM_DBLCLK)) show_detail();
@@ -1086,8 +1145,8 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM w, LPARAM 
     case WM_MOUSEMOVE: if (app.drag) { RECT r; GetClientRect(window,&r); if (app.drag == 1) app.split = MulDiv((short)LOWORD(l),96,(int)app.dpi); else app.bottom = MulDiv(r.bottom-(short)HIWORD(l)-px(24),96,(int)app.dpi); if (app.split < 130) app.split = 130; if (app.bottom < 100) app.bottom = 100; layout(); } return 0;
     case WM_LBUTTONUP: app.drag = 0; ReleaseCapture(); return 0;
     case WM_DRAWITEM: if (((DRAWITEMSTRUCT *)l)->hwndItem == app.statistics_view) { paint_statistics((DRAWITEMSTRUCT *)l); return TRUE; } break;
-    case WM_CLOSE: if (app.closing) return 0; app.closing = true; app.monitoring = false; win_tools_cancel(app.tools_job); win_backend_shutdown(&app.backend); win_export_cancel(app.export_job); update_status(); if (!app.tools_job && !app.export_job && win_backend_release(&app.backend)) DestroyWindow(window); return 0;
-    case WM_DESTROY: save_settings(); KillTimer(window,1); if (app.font) DeleteObject(app.font); if (app.images) ImageList_Destroy(app.images); PostQuitMessage(0); return 0;
+    case WM_CLOSE: if (app.closing) return 0; app.closing = true; app.monitoring = false; win_tools_cancel(app.tools_job); win_backend_shutdown(&app.backend); win_export_cancel(app.export_job); update_status(); if (!app.tools_job && !app.export_job && history_close_ready() && win_backend_release(&app.backend)) DestroyWindow(window); return 0;
+    case WM_DESTROY: {HMENU menu=GetMenu(window);SetMenu(window,NULL);win_theme_destroy_menu(menu);} save_settings(); KillTimer(window,1); if (app.font) DeleteObject(app.font); if (app.images) ImageList_Destroy(app.images); PostQuitMessage(0); return 0;
     }
     return DefWindowProcW(window,message,w,l);
 }
@@ -1099,6 +1158,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command, int s
     app.preview = wcsstr(command,L"--smoke-preview") != NULL;
     app.smoke = wcsstr(command,L"--smoke-test") != NULL || app.smoke_close_scan || app.smoke_close_tools || app.smoke_dpi || app.preview;
     settings_path(); wchar_t language[8]; GetPrivateProfileStringW(L"UI",L"Language",L"",language,8,app.ini);
+    wchar_t theme[16];GetPrivateProfileStringW(L"UI",L"Theme",L"system",theme,16,app.ini);win_theme_set(!wcscmp(theme,L"dark")?WIN_THEME_DARK:!wcscmp(theme,L"light")?WIN_THEME_LIGHT:WIN_THEME_SYSTEM);
     app.system_language = wcscmp(language,L"ru") != 0 && wcscmp(language,L"en") != 0;
     app.russian = language_is_russian(language,GetUserDefaultUILanguage());
     if (app.preview && wcsstr(command,L"--smoke-preview-en")) app.russian = false;
@@ -1126,6 +1186,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command, int s
     }
     DestroyAcceleratorTable(accel);
     if (app.smoke && app.backend.initialized) ExitProcess(26);
-    WSACleanup();
+    win_theme_cleanup();WSACleanup();
     ExitProcess(result < 0 ? 5 : 0);
 }

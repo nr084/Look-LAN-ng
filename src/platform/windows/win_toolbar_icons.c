@@ -12,7 +12,8 @@ void win_toolbar_icon(HDC target, int x, int y, int size, unsigned icon, bool en
     RECT bounds = {0,0,size*4,size*4}; HBRUSH bg = CreateSolidBrush(background);
     FillRect(dc,&bounds,bg); DeleteObject(bg);
     SetMapMode(dc,MM_ANISOTROPIC); SetWindowExtEx(dc,24,24,NULL); SetViewportExtEx(dc,size*4,size*4,NULL);
-    COLORREF ink = enabled ? RGB(51,75,88) : GetSysColor(COLOR_GRAYTEXT);
+    bool dark=(GetRValue(background)+GetGValue(background)+GetBValue(background))<300;
+    COLORREF ink = enabled ? (dark?RGB(216,228,237):RGB(51,75,88)) : (dark?RGB(116,127,138):GetSysColor(COLOR_GRAYTEXT));
     COLORREF accent = enabled ? (icon == 1 ? RGB(196,82,65) : RGB(20,145,148)) : ink;
     HPEN outline = CreatePen(PS_SOLID,2,ink), colored = CreatePen(PS_SOLID,2,accent);
     HBRUSH fill = CreateSolidBrush(accent);

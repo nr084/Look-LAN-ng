@@ -6,7 +6,7 @@ typedef struct {
     ip_address_t address;
     char hostname[256];
     uint8_t mac[6];
-    bool has_mac, online, cache_only;
+    bool has_mac, online, cache_only, historical;
     os_family_t os_family;
     uint8_t os_confidence, ttl;
     uint32_t latency_ms, interface_index;

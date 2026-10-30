@@ -7,6 +7,7 @@
 #include "details.h"
 #include "posix_tools.h"
 #include "desktop_io.h"
+#include "../history_store.h"
 #define DESKTOP_HOSTS 65536
 typedef struct {
     posix_backend_t backend; posix_interface_t interfaces[POSIX_INTERFACES]; size_t interface_count,selected;
@@ -21,6 +22,8 @@ typedef struct {
     bool names_pending,arp_only[DESKTOP_HOSTS],cached_round[DESKTOP_HOSTS];uint8_t round_proof[DESKTOP_HOSTS];
     bool row_dirty[DESKTOP_HOSTS];
     char settings[4096],error[256];
+    bool backend_closed,persistent,auto_profile,history_dirty,history_loading,history_pending,history_blocked;
+    char profile_path[4096],io_profile_path[4096],history_path[4096];history_store_t *history_job;uint64_t history_due;
 } desktop_app_t;
 bool desktop_init(desktop_app_t *app,const char *system_language);
 void desktop_language(desktop_app_t *app,unsigned language,const char *system_language);

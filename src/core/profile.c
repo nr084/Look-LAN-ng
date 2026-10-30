@@ -60,7 +60,7 @@ bool profile_parse(const char *data, size_t n, profile_t *out, char *error, size
         size_t nonblank = end; while (nonblank > begin && (data[nonblank-1] == ' ' || data[nonblank-1] == '\t')) --nonblank;
         if (begin == nonblank || data[begin] == '#') continue;
         const char *s = data+begin; size_t length = end-begin;
-        if (!header) { header = key_is(s,nonblank-begin,"Look@LAN-ngProfile=1"); if (!header) ok = fail(error,cap,"Unsupported profile header/version"); continue; }
+        if (!header) { header = key_is(s,nonblank-begin,"Look@LAN-ngProfile=2"); if (!header) ok = fail(error,cap,"Unsupported profile header/version"); continue; }
         const char *equal = memchr(s,'=',length); if (!equal) { ok = fail(error,cap,"Expected key=value"); break; }
         size_t key_n = (size_t)(equal-s), value_n = length-key_n-1; const char *value = equal+1; unsigned field = 0;
         if (key_is(s,key_n,"range")) { if (p->range_count == NETWORK_MAX_RANGES || !range_parse(value,value_n,&p->ranges[p->range_count])) ok = fail(error,cap,"Invalid or excessive range"); else ++p->range_count; continue; }
@@ -109,7 +109,7 @@ bool profile_write(const profile_t *p, text_writer_t writer, void *ctx) {
     if (!writer || !profile_validate(p,NULL,0)) return false;
     profile_output_t output={writer,ctx,0};writer=limited_profile_write;ctx=&output;
     char ports[PROFILE_PORT_TEXT_CAPACITY], buffer[256]; if (!profile_ports_text(p,ports,sizeof(ports))) return false;
-    if (!write_text(writer,ctx,"Look@LAN-ngProfile=1\n") || !write_field(writer,ctx,"name",p->name) || !write_field(writer,ctx,"interface_id",p->interface_id) || !write_field(writer,ctx,"interface_name",p->interface_name)) return false;
+    if (!write_text(writer,ctx,"Look@LAN-ngProfile=2\n") || !write_field(writer,ctx,"name",p->name) || !write_field(writer,ctx,"interface_id",p->interface_id) || !write_field(writer,ctx,"interface_name",p->interface_name)) return false;
     for (size_t i = 0; i < p->range_count; ++i) { char first[32], last[32]; ipv4_format(p->ranges[i].first,first,32); ipv4_format(p->ranges[i].last,last,32); snprintf(buffer,sizeof(buffer),"range=%s-%s\n",first,last); if (!write_text(writer,ctx,buffer)) return false; }
     snprintf(buffer,sizeof(buffer),"icmp_timeout_ms=%u\ntcp_timeout_ms=%u\nmonitor_interval_sec=%u\nconcurrency=%u\n",p->icmp_timeout_ms,p->tcp_timeout_ms,p->monitor_interval_sec,p->concurrency);
     return write_field(writer,ctx,"ports",ports) && write_text(writer,ctx,buffer) && write_field(writer,ctx,"notes",p->notes);

@@ -18,27 +18,24 @@ def main():
     if args.target != 'linux':
         parser.error('macOS builds/packaging moved to Mac; use tools/build-macos.sh')
     tools=args.tools_root.resolve();store=tools/'macos'
-    llvm=sorted((store/'llvm').glob('*/bin/clang.exe'),key=lambda p:tuple(map(int,p.parents[1].name.split('.'))))[-1].parent
+    from build_preflight import prepare
+    llvm=prepare('linux').parent
     cmake=next((store/'cmake').rglob('cmake.exe'));ninja=next((store/'ninja').rglob('ninja.exe'))
     ENV=dict(os.environ);ENV['PATH']=str(llvm)+os.pathsep+ENV['PATH'];ENV['LC_ALL']='C'
     logs=ROOT/'build/port-logs';base=[cmake,'-S',ROOT,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_MAKE_PROGRAM='+ninja.as_posix(),'-DDESKTOP_HOST_PYTHON='+Path(sys.executable).as_posix()]
-    if args.target in ('all','macos'):
-        sdk=sorted((store/'sdk').glob('MacOSX*.sdk'))[-1]
-        for arch in ('x86_64','arm64'):
-            build=ROOT/'build'/('macos-'+arch)
-            command=base+['-B',build,'-DCMAKE_SYSTEM_NAME=Darwin','-DCMAKE_SYSTEM_PROCESSOR='+arch,'-DCMAKE_OSX_ARCHITECTURES='+arch,'-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0','-DCMAKE_OSX_SYSROOT='+sdk.as_posix(),'-DCMAKE_C_COMPILER='+(llvm/'clang.exe').as_posix(),'-DCMAKE_C_COMPILER_TARGET='+arch+'-apple-macos13.0','-DCMAKE_OBJC_COMPILER='+(llvm/'clang.exe').as_posix(),'-DCMAKE_OBJC_COMPILER_TARGET='+arch+'-apple-macos13.0','-DCMAKE_AR='+(llvm/'llvm-ar.exe').as_posix(),'-DCMAKE_RANLIB='+(llvm/'llvm-ranlib.exe').as_posix(),'-DCMAKE_INSTALL_NAME_TOOL='+(llvm/'llvm-install-name-tool.exe').as_posix(),'-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld']
-            run(command,logs/(arch+'-configure.log'));run([cmake,'--build',build,'--parallel','8'],logs/(arch+'-build.log'))
     if args.target in ('all','linux'):
         sysroot=tools/'linux/sysroot';metadata=json.loads((tools/'linux/target.json').read_text())
         build=ROOT/'build/linux-x64';build.mkdir(parents=True,exist_ok=True)
         # Use our own ELF driver copy: never mutate the shared tool store.
         import shutil
-        driver=build/'linker';driver.mkdir(exist_ok=True);shutil.copyfile(llvm/'lld.exe',driver/'ld.lld.exe');ENV['PATH']=str(driver)+os.pathsep+ENV['PATH']
+        driver=build/'linker';driver.mkdir(exist_ok=True);shutil.copyfile(llvm/('lld.exe' if (llvm/'lld.exe').exists() else 'ld.lld.exe'),driver/'ld.lld.exe');ENV['PATH']=str(driver)+os.pathsep+ENV['PATH']
         toolchain=build/'target.cmake'
         toolchain.write_text('\n'.join(['set(CMAKE_SYSTEM_NAME Linux)','set(CMAKE_SYSTEM_PROCESSOR x86_64)','set(CMAKE_C_COMPILER '+quote(llvm/'clang.exe')+')','set(CMAKE_C_COMPILER_TARGET x86_64-linux-gnu)','set(CMAKE_SYSROOT '+quote(sysroot)+')','set(CMAKE_C_FLAGS_INIT [=[--gcc-toolchain='+quote(sysroot/'usr')+']=])','set(CMAKE_C_STANDARD_INCLUDE_DIRECTORIES '+quote(sysroot/'usr/include/x86_64-linux-gnu')+')','set(CMAKE_EXE_LINKER_FLAGS_INIT "-fuse-ld=lld")','set(CMAKE_AR '+quote(llvm/'llvm-ar.exe')+')','set(CMAKE_RANLIB '+quote(llvm/'llvm-ranlib.exe')+')','set(CMAKE_FIND_ROOT_PATH '+quote(sysroot)+')','set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)','set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)','set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)','set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)'])+'\n',encoding='utf-8')
         gtk=build/'gtk.cmake';includes=[quote(sysroot/flag[2:].lstrip('/')) for flag in shlex.split(metadata['gtk_cflags']) if flag.startswith('-I')];libs=[flag[2:] for flag in shlex.split(metadata['gtk_libs']) if flag.startswith('-l')]
         gtk.write_text('set(GTK3_INCLUDE_DIRS '+' '.join(includes)+')\nset(GTK3_LIBRARIES '+' '.join(libs)+')\nset(GTK3_LIBRARY_DIRS '+quote(sysroot/'usr/lib/x86_64-linux-gnu')+')\n',encoding='utf-8')
         run(base+['-B',build,'-DCMAKE_TOOLCHAIN_FILE='+toolchain.as_posix(),'-DLOOKLAN_TARGET_GTK='+gtk.as_posix()],logs/'linux-configure.log');run([cmake,'--build',build,'--parallel','8'],logs/'linux-build.log')
+    import shutil
+    shutil.copyfile(ROOT/'build/validation/build-preflight-linux.json',ROOT/'build/linux-x64/preflight.json')
     sources=hashlib.sha256()
     sources.update((ROOT/'CMakeLists.txt').read_bytes());sources.update((ROOT/'data/oui.bin').read_bytes())
     for folder in (ROOT/'src',ROOT/'tools'):

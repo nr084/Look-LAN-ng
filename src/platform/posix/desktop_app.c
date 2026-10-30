@@ -1,5 +1,9 @@
 #include "text.h"
 #include "desktop_app.h"
+#include <errno.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 #include "build_info.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +23,7 @@ const char *desktop_tr(const desktop_app_t *a,const char *en,const char *ru){ret
 static bool ru_system(const char *language){return language && language[0]=='r' && language[1]=='u' && (language[2]=='_' || language[2]=='-' || language[2]==0);}
 void desktop_language(desktop_app_t *a,unsigned language,const char *system){
     a->language=language<=2 ? language : 0; a->russian=a->language==2 || (!a->language && ru_system(system));
-    if(a->settings[0]){FILE *f=fopen(a->settings,"w");if(f){fprintf(f,"%u\n",a->language);fclose(f);chmod(a->settings,0600);}}
+    if(a->persistent && a->settings[0]){FILE *f=fopen(a->settings,"w");if(f){fprintf(f,"%u\n",a->language);fclose(f);chmod(a->settings,0600);}}
 }
 bool desktop_init(desktop_app_t *a,const char *system){
     memset(a,0,sizeof(*a));a->hosts=calloc(DESKTOP_HOSTS,sizeof(*a->hosts));a->log=calloc(10000,sizeof(*a->log));
@@ -27,29 +31,58 @@ bool desktop_init(desktop_app_t *a,const char *system){
     if(!a->hosts || !a->log || !a->details || !posix_backend_init(&a->backend)){free(a->hosts);free(a->log);free(a->details);return false;}
     if(!vendor_open(&a->vendors,desktop_oui,desktop_oui_size)){posix_backend_destroy(&a->backend);free(a->hosts);free(a->log);free(a->details);return false;}
     monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);profile_defaults(&a->profile);
-    const char *home=getenv("HOME"); if(home){char directory[4096];
+    char base[4096]={0};
 #ifdef __APPLE__
-        snprintf(directory,sizeof(directory),"%s/Library/Application Support/LookLAN-ng",home);
+    const char *home=getenv("HOME");if(home)snprintf(base,sizeof(base),"%s/Library/Application Support/LookLAN-ng",home);
 #else
-        const char *config=getenv("XDG_CONFIG_HOME");if(config && config[0]=='/')snprintf(directory,sizeof(directory),"%s",config);else snprintf(directory,sizeof(directory),"%s/.config",home);
-        mkdir(directory,0700);size_t n=strlen(directory);snprintf(directory+n,sizeof(directory)-n,"/LookLAN-ng");
+    ssize_t length=readlink("/proc/self/exe",base,sizeof(base)-1);if(length>0){base[length]=0;char *slash=strrchr(base,'/');if(slash)*slash=0;}
 #endif
-        if(!mkdir(directory,0700) || access(directory,W_OK)==0)snprintf(a->settings,sizeof(a->settings),"%s/language",directory);
-    }
+    if(base[0] && strlen(base)+32<sizeof(a->settings)){snprintf(a->settings,sizeof(a->settings),"%s/Look@LAN-ng.ini",base);snprintf(a->profiles_directory,sizeof(a->profiles_directory),"%s/profiles",base);}
     FILE *f=a->settings[0] ? fopen(a->settings,"r") : NULL;unsigned language=0;if(f){if(fscanf(f,"%u",&language)!=1 || language>2)language=0;fclose(f);}
-    if(a->settings[0]){snprintf(a->profiles_directory,sizeof(a->profiles_directory),"%s",a->settings);char *slash=strrchr(a->profiles_directory,'/');if(slash && strlen(a->profiles_directory)+2<sizeof(a->profiles_directory))snprintf(slash,sizeof(a->profiles_directory)-(size_t)(slash-a->profiles_directory),"/profiles");else a->profiles_directory[0]=0;}
+    a->auto_profile=true;
     a->language=language;a->russian=language==2 || (!language && ru_system(system));return desktop_refresh(a);
 }
-bool desktop_refresh(desktop_app_t *a){if(a->scanning || a->monitoring || a->tools || a->io)return false;a->interface_count=posix_interfaces(a->interfaces,POSIX_INTERFACES);a->selected=SIZE_MAX;a->host_count=0;size_t best=SIZE_MAX;for(size_t i=0;i<a->interface_count;++i){const posix_interface_t *nic=&a->interfaces[i];if(!nic->automatic)continue;if(best==SIZE_MAX || (nic->gateway && !a->interfaces[best].gateway) || (nic->gateway && nic->has_metric && a->interfaces[best].has_metric && nic->metric<a->interfaces[best].metric))best=i;}return best!=SIZE_MAX ? desktop_select(a,best):true;}
+static void history_save(desktop_app_t *a){
+    if(!a->persistent || !a->history_path[0] || a->history_pending || a->history_job || a->history_blocked || !a->history_dirty)return;
+    a->history_job=history_store_start(a->history_path,&a->profile,&a->monitor,false,0);a->history_loading=false;if(a->history_job){a->history_dirty=false;a->history_due=monotonic_seconds()+5;}
+}
+static void history_attach(desktop_app_t *a){
+    a->history_path[0]=0;a->history_blocked=false;a->history_dirty=false;
+    if(!a->profile_path[0] || a->selected>=a->interface_count || strlen(a->profile_path)+12>=sizeof(a->history_path))return;
+    snprintf(a->history_path,sizeof(a->history_path),"%s.lanhistory",a->profile_path);a->history_pending=history_store_exists(a->history_path);a->history_due=monotonic_seconds();
+}
+static bool history_tick(desktop_app_t *a){
+    bool changed=false;
+    if(a->history_job && history_store_done(a->history_job)){
+        bool ok=history_store_success(a->history_job);
+        if(ok && a->history_loading){history_store_apply(a->history_job,&a->monitor);memset(a->row_dirty,1,sizeof(a->row_dirty));changed=true;}
+        if(!ok){a->history_blocked=true;snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"History read/write failed; existing data preserved, automatic writes disabled","Ошибка чтения/записи истории; файл сохранён, автоматическая запись отключена"));changed=true;}
+        history_store_free(a->history_job);a->history_job=NULL;a->history_loading=false;
+    }
+    if(!a->history_job && a->history_pending){a->history_job=history_store_start(a->history_path,&a->profile,&a->monitor,true,a->interfaces[a->selected].index);a->history_loading=a->history_job!=NULL;a->history_pending=false;if(!a->history_job)a->history_blocked=true;}
+    if(!a->scanning && !a->closing && monotonic_seconds()>=a->history_due)history_save(a);
+    return changed;
+}
+static bool make_directory(const char *path){char copy[4096];struct stat info;if(strlen(path)>=sizeof(copy))return false;snprintf(copy,sizeof(copy),"%s",path);for(char *c=copy+1;*c;++c)if(*c=='/'){*c=0;if((mkdir(copy,0700) && errno!=EEXIST) || stat(copy,&info) || !S_ISDIR(info.st_mode))return false;*c='/';}return (!mkdir(copy,0700) || errno==EEXIST) && !stat(copy,&info) && S_ISDIR(info.st_mode) && access(copy,W_OK)==0;}
+bool desktop_refresh(desktop_app_t *a){
+    if(a->scanning || a->monitoring || a->tools || a->io || a->history_job || a->history_pending)return false;
+    a->interface_count=posix_interfaces(a->interfaces,POSIX_INTERFACES);size_t best=SIZE_MAX;
+    for(size_t i=0;i<a->interface_count;++i){const posix_interface_t *nic=&a->interfaces[i];
+        if(a->profile.interface_id[0] && !strcmp(nic->name,a->profile.interface_id)){a->selected=i;for(size_t h=0;h<a->host_count;++h)a->hosts[h].interface_index=nic->index;return true;}
+        if(nic->automatic && (best==SIZE_MAX || (nic->gateway && !a->interfaces[best].gateway) || (nic->gateway && nic->has_metric && a->interfaces[best].has_metric && nic->metric<a->interfaces[best].metric)))best=i;
+    }
+    if(a->profile.interface_id[0]){a->selected=SIZE_MAX;return true;}
+    return best!=SIZE_MAX?desktop_select(a,best):true;
+}
 bool desktop_select(desktop_app_t *a,size_t index){
-    if(a->scanning || a->monitoring || a->tools || a->io || index>=a->interface_count)return false;a->selected=index;monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);
+    if(a->scanning || a->monitoring || a->tools || a->io || a->history_job || a->history_pending || index>=a->interface_count)return false;history_save(a);a->profile_path[0]=a->history_path[0]=0;a->history_pending=false;a->history_dirty=false;a->selected=index;monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);
     a->completed=a->total=0;a->scan_started_ms=a->scan_elapsed_ms=0;
     posix_invalidate_names(&a->backend);memset(a->arp_only,0,sizeof(a->arp_only));
     posix_interface_t *nic=&a->interfaces[index];profile_defaults(&a->profile);
     snprintf(a->profile.interface_id,sizeof(a->profile.interface_id),"%s",nic->name);network_range(nic->ip,nic->prefix,&a->profile.ranges[0]);a->profile.range_count=1;return true;
 }
 bool desktop_start(desktop_app_t *a,const char *range){
-    if(a->scanning || a->closing || a->tools || a->io || a->selected>=a->interface_count)return false;
+    if(a->scanning || a->closing || a->tools || a->io || a->history_pending || a->history_loading || a->selected>=a->interface_count)return false;
     if(range && *range){ipv4_range_t parsed;if(!range_parse(range,strlen(range),&parsed)){snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"Invalid IPv4 range","Некорректный диапазон IPv4"));return false;}a->profile.ranges[0]=parsed;a->profile.range_count=1;}
     uint64_t addresses=0;if(!ranges_normalize(a->profile.ranges,&a->profile.range_count,&addresses) || addresses>65536 || !addresses){snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"Use a range of 1–65536 IPv4 addresses","Укажите диапазон из 1–65536 IPv4 адресов"));return false;}
     a->error[0]=0;a->failed=false;a->completed=0;a->total=(uint32_t)addresses;
@@ -62,14 +95,15 @@ uint64_t desktop_scope_size(const desktop_app_t *a,const char *range){if(range &
 bool desktop_single(desktop_app_t *a,uint32_t ip){ipv4_range_t ranges[NETWORK_MAX_RANGES];size_t count=a->profile.range_count;memcpy(ranges,a->profile.ranges,count*sizeof(*ranges));char target[32];ipv4_format(ip,target,sizeof(target));bool started=desktop_start(a,target);memcpy(a->profile.ranges,ranges,count*sizeof(*ranges));a->profile.range_count=count;if(started){lan_host_t candidate={0};candidate.address=ipv4_address(ip);candidate.interface_index=a->interfaces[a->selected].index;candidate.cache_only=true;monitor_observe(&a->monitor,&candidate,false,(uint64_t)time(NULL));}return started;}
 bool desktop_single_target(desktop_app_t *a,const char *target){if(a->scanning || a->monitoring || a->tools || a->io || a->closing || a->selected>=a->interface_count)return false;uint32_t ip;if(ipv4_parse(target,strlen(target),&ip))return desktop_single(a,ip);a->tools=posix_forward_start(&a->interfaces[a->selected],target);if(!a->tools){snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"Invalid host name or IPv4 address","Некорректное имя узла или адрес IPv4"));return false;}a->resolving=true;a->resolve_cancelled=false;a->resolved_ip=0;return true;}
 bool desktop_poll(desktop_app_t *a){
-    posix_event_t event;bool changed=false;unsigned processed=0;
+    posix_event_t event;bool changed=history_tick(a);unsigned processed=0;
     if(a->io && desktop_io_finished(a->io)){
         desktop_io_kind_t kind=desktop_io_kind(a->io);if(kind==DESKTOP_LIST_PROFILES){a->saved_count=desktop_io_profiles(a->io,a->saved_profiles);a->saved_changed=true;}profile_t *p=kind==DESKTOP_OPEN_PROFILE ? malloc(sizeof(*p)):NULL;bool cancelled=false;bool success=desktop_io_result(a->io,p,&cancelled);desktop_io_free(a->io);a->io=NULL;
-        if(kind==DESKTOP_OPEN_PROFILE && success && p){size_t nic=SIZE_MAX;for(size_t i=0;i<a->interface_count;++i)if(!strcmp(a->interfaces[i].name,p->interface_id))nic=i;if(nic!=SIZE_MAX){posix_invalidate_names(&a->backend);memset(a->arp_only,0,sizeof(a->arp_only));a->profile=*p;a->selected=nic;monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);a->profile_changed=true;}else{free(a->pending_profile);a->pending_profile=p;p=NULL;}}
+        if(kind==DESKTOP_OPEN_PROFILE && success && p){size_t nic=SIZE_MAX;for(size_t i=0;i<a->interface_count;++i)if(!strcmp(a->interfaces[i].name,p->interface_id))nic=i;if(nic!=SIZE_MAX){posix_invalidate_names(&a->backend);memset(a->arp_only,0,sizeof(a->arp_only));a->profile=*p;a->selected=nic;monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);snprintf(a->profile_path,sizeof(a->profile_path),"%s",a->io_profile_path);a->persistent=true;history_attach(a);a->profile_changed=true;}else{free(a->pending_profile);a->pending_profile=p;p=NULL;}}
         if(kind==DESKTOP_OPEN_PROFILE && !p && !a->pending_profile)success=false;free(p);
         if(kind==DESKTOP_EXPORT)monitor_note(&a->monitor,success ? MON_EXPORT_FINISHED:MON_EXPORT_ERROR,cancelled ? "Cancelled":NULL,(uint64_t)time(NULL));
         if(!success && !cancelled && !a->error[0])snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"File operation failed","Не удалось выполнить операцию с файлом"));changed=true;
-        if(kind==DESKTOP_SAVE_PROFILE && success && a->profiles_directory[0])desktop_reload_profiles(a);
+        if(kind==DESKTOP_SAVE_PROFILE && success){snprintf(a->profile_path,sizeof(a->profile_path),"%s",a->io_profile_path);a->persistent=true;history_attach(a);a->history_pending=false;a->history_dirty=true;history_save(a);desktop_language(a,a->language,a->russian?"ru":"en");if(!a->closing)desktop_reload_profiles(a);}
+        if(kind==DESKTOP_LIST_PROFILES && a->auto_profile && !a->closing){a->auto_profile=false;if(a->saved_count==1)desktop_profile_open(a,a->saved_profiles[0].path);}
     }
     if(a->tools){ping_sample_t sample;while(posix_tools_pop(a->tools,&sample)){if(a->resolving){if(sample.received && sample.status!=SCAN_CANCELLED)a->resolved_ip=sample.reply_ip;}else if(a->tracing){if(a->trace_count<30)a->trace[a->trace_count++]=sample;}else details_ping_add(a->details,sample);changed=true;}
         if(posix_tools_reap(a->tools)){while(posix_tools_pop(a->tools,&sample)){if(a->resolving){if(sample.received && sample.status!=SCAN_CANCELLED)a->resolved_ip=sample.reply_ip;}else if(a->tracing){if(a->trace_count<30)a->trace[a->trace_count++]=sample;}else details_ping_add(a->details,sample);}posix_tools_free(a->tools);a->tools=NULL;if(a->resolving){a->resolving=false;if(!a->resolve_cancelled){if(a->resolved_ip)desktop_single(a,a->resolved_ip);else snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"No IPv4 address found","IPv4-адрес не найден"));}}changed=true;}}
@@ -86,14 +120,14 @@ bool desktop_poll(desktop_app_t *a){
     if(a->scanning && empty && posix_reap(&a->backend)){bool complete=!a->failed && !atomic_load(&a->backend.cancel);if(complete)for(size_t i=0;i<a->host_count;++i){lan_host_t *h=&a->hosts[i];if(a->round_proof[i])a->arp_only[i]=a->round_proof[i]==PX_PROOF_ARP;else if(a->arp_only[i] && h->first_seen && h->seen_round!=a->monitor.round){h->cache_only=a->cached_round[i];a->row_dirty[i]=true;if(h->cache_only){h->online=false;h->has_latency=false;}else if(h->missed_rounds+1>=a->monitor.offline_threshold)h->online=true;}}monitor_finish(&a->monitor,complete,(uint64_t)time(NULL));if(complete)for(size_t i=0;i<a->host_count;++i)if(!a->hosts[i].online)a->row_dirty[i]=true;a->scan_elapsed_ms=monotonic_ms()-a->scan_started_ms;a->scanning=false;if(a->failed)a->monitoring=false;a->next_round=monotonic_seconds()+a->profile.monitor_interval_sec;changed=true;}
     if(a->monitoring && !a->scanning && !a->tools && !a->io && monotonic_seconds()>=a->next_round){if(!desktop_start(a,NULL))a->monitoring=false;changed=true;}
     if(a->scanning && monotonic_ms()-a->status_updated_ms>=150){a->status_updated_ms=monotonic_ms();changed=true;}
-    bool names_pending=posix_names_pending(&a->backend);if(names_pending!=a->names_pending){a->names_pending=names_pending;changed=true;}return changed;
+    if(changed && !a->history_loading && !a->history_pending)a->history_dirty=true;bool names_pending=posix_names_pending(&a->backend);if(names_pending!=a->names_pending){a->names_pending=names_pending;changed=true;}return changed;
 }
-bool desktop_close(desktop_app_t *a){if(a->closed)return true;a->closing=true;desktop_stop(a);if(a->io){if(!desktop_io_finished(a->io))return false;desktop_io_result(a->io,NULL,NULL);desktop_io_free(a->io);a->io=NULL;}if(a->tools){if(!posix_tools_reap(a->tools))return false;posix_tools_free(a->tools);a->tools=NULL;}if(!posix_backend_destroy(&a->backend))return false;free(a->pending_profile);a->pending_profile=NULL;free(a->hosts);free(a->log);free(a->details);a->hosts=NULL;a->log=NULL;a->details=NULL;a->host_count=0;a->closed=true;return true;}
+bool desktop_close(desktop_app_t *a){if(a->closed)return true;a->closing=true;if(!a->backend_closed)desktop_stop(a);if(a->io){if(!desktop_io_finished(a->io))return false;desktop_poll(a);if(a->io)return false;}if(a->tools){if(!posix_tools_reap(a->tools))return false;posix_tools_free(a->tools);a->tools=NULL;}if(!a->backend_closed){if(!posix_backend_destroy(&a->backend))return false;a->backend_closed=true;}history_tick(a);history_save(a);if(a->history_job || a->history_pending)return false;free(a->pending_profile);a->pending_profile=NULL;free(a->hosts);free(a->log);free(a->details);a->hosts=NULL;a->log=NULL;a->details=NULL;a->host_count=0;a->closed=true;return true;}
 static void timestamp(uint64_t t,char *out,size_t cap){if(!t){snprintf(out,cap,"—");return;}time_t value=(time_t)t;struct tm local;localtime_r(&value,&local);strftime(out,cap,"%Y-%m-%d %H:%M:%S",&local);}
 void desktop_cell(const desktop_app_t *a,size_t index,unsigned col,char *out,size_t cap){
     if(index>=a->host_count){if(cap)out[0]=0;return;}const lan_host_t *h=&a->hosts[index];out[0]=0;
     switch(col){
-    case 0:snprintf(out,cap,"%s",!h->first_seen || h->cache_only ? desktop_tr(a,"UNKNOWN","НЕИЗВЕСТНО") : !h->online ? desktop_tr(a,"OFFLINE","НЕ В СЕТИ") : h->new_device ? desktop_tr(a,"NEW","НОВЫЙ") : h->changed ? desktop_tr(a,"CHANGED","ИЗМЕНЁН") : h->online ? desktop_tr(a,"ONLINE","В СЕТИ") : desktop_tr(a,"OFFLINE","НЕ В СЕТИ"));break;
+    case 0:snprintf(out,cap,"%s",h->historical ? desktop_tr(a,"HISTORY","ИСТОРИЯ") : !h->first_seen || h->cache_only ? desktop_tr(a,"UNKNOWN","НЕИЗВЕСТНО") : !h->online ? desktop_tr(a,"OFFLINE","НЕ В СЕТИ") : h->new_device ? desktop_tr(a,"NEW","НОВЫЙ") : h->changed ? desktop_tr(a,"CHANGED","ИЗМЕНЁН") : h->online ? desktop_tr(a,"ONLINE","В СЕТИ") : desktop_tr(a,"OFFLINE","НЕ В СЕТИ"));break;
     case 1:ipv4_format(ipv4_value(&h->address),out,cap);break;
     case 2:snprintf(out,cap,"%s",h->hostname[0] ? h->hostname : desktop_tr(a,"<unknown>","<неизвестно>"));break;
     case 3:if(h->has_mac)snprintf(out,cap,"%02X:%02X:%02X:%02X:%02X:%02X",h->mac[0],h->mac[1],h->mac[2],h->mac[3],h->mac[4],h->mac[5]);break;
@@ -105,11 +139,18 @@ void desktop_cell(const desktop_app_t *a,size_t index,unsigned col,char *out,siz
     }
 }
 bool desktop_export(desktop_app_t *a,const char *path,report_format_t format){if(a->io)return false;a->io=desktop_io_start(DESKTOP_EXPORT,path,&a->profile,a->hosts,a->host_count,&a->vendors,format,a->russian,NULL);if(a->io)monitor_note(&a->monitor,MON_EXPORT_STARTED,path,(uint64_t)time(NULL));return a->io!=NULL;}
-bool desktop_profile_save(desktop_app_t *a,const char *path){if(a->io)return false;a->io=desktop_io_start(DESKTOP_SAVE_PROFILE,path,&a->profile,NULL,0,&a->vendors,REPORT_CSV,a->russian,a->profiles_directory);return a->io!=NULL;}
+bool desktop_profile_save(desktop_app_t *a,const char *path){
+    if(a->io || a->history_job || a->history_pending || !a->profiles_directory[0])return false;
+    const char *name=strrchr(path,'/');name=name?name+1:path;
+    if(!*name || !strcmp(name,".") || !strcmp(name,"..") || strlen(a->profiles_directory)+strlen(name)+2>=sizeof(a->io_profile_path) || !make_directory(a->profiles_directory))return false;
+    snprintf(a->io_profile_path,sizeof(a->io_profile_path),"%s/%s",a->profiles_directory,name);
+    if(a->history_blocked && !strcmp(a->profile_path,a->io_profile_path)){snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"History unavailable; save as a different profile","История недоступна; сохраните под другим именем профиля"));return false;}
+    a->io=desktop_io_start(DESKTOP_SAVE_PROFILE,a->io_profile_path,&a->profile,NULL,0,&a->vendors,REPORT_CSV,a->russian,NULL);return a->io!=NULL;
+}
 bool desktop_reload_profiles(desktop_app_t *a){if(a->io || !a->profiles_directory[0])return false;a->io=desktop_io_start(DESKTOP_LIST_PROFILES,a->profiles_directory,&a->profile,NULL,0,&a->vendors,REPORT_CSV,a->russian,NULL);return a->io!=NULL;}
-bool desktop_profile_rebind(desktop_app_t *a,size_t index){if(!a->pending_profile)return false;if(index>=a->interface_count){free(a->pending_profile);a->pending_profile=NULL;return false;}if(a->scanning || a->monitoring || a->tools || a->io)return false;posix_invalidate_names(&a->backend);a->profile=*a->pending_profile;free(a->pending_profile);a->pending_profile=NULL;a->selected=index;snprintf(a->profile.interface_id,sizeof(a->profile.interface_id),"%s",a->interfaces[index].name);memset(a->arp_only,0,sizeof(a->arp_only));monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);a->profile_changed=true;return true;}
-bool desktop_profile_open(desktop_app_t *a,const char *path){if(a->io || a->scanning || a->monitoring || a->tools)return false;a->io=desktop_io_start(DESKTOP_OPEN_PROFILE,path,&a->profile,NULL,0,&a->vendors,REPORT_CSV,a->russian,NULL);return a->io!=NULL;}
-void desktop_stop(desktop_app_t *a){a->monitoring=false;if(a->resolving)a->resolve_cancelled=true;posix_stop(&a->backend);posix_tools_cancel(a->tools);desktop_io_cancel(a->io);}
+bool desktop_profile_rebind(desktop_app_t *a,size_t index){if(!a->pending_profile)return false;if(index>=a->interface_count){free(a->pending_profile);a->pending_profile=NULL;return false;}if(a->scanning || a->monitoring || a->tools || a->io)return false;posix_invalidate_names(&a->backend);a->profile=*a->pending_profile;free(a->pending_profile);a->pending_profile=NULL;a->selected=index;snprintf(a->profile.interface_id,sizeof(a->profile.interface_id),"%s",a->interfaces[index].name);memset(a->arp_only,0,sizeof(a->arp_only));monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);snprintf(a->profile_path,sizeof(a->profile_path),"%s",a->io_profile_path);a->persistent=true;history_attach(a);a->profile_changed=true;return true;}
+bool desktop_profile_open(desktop_app_t *a,const char *path){if(a->io || a->scanning || a->monitoring || a->tools || a->history_job || a->history_pending)return false;history_save(a);snprintf(a->io_profile_path,sizeof(a->io_profile_path),"%s",path);a->io=desktop_io_start(DESKTOP_OPEN_PROFILE,path,&a->profile,NULL,0,&a->vendors,REPORT_CSV,a->russian,NULL);return a->io!=NULL;}
+void desktop_stop(desktop_app_t *a){a->monitoring=false;if(a->resolving)a->resolve_cancelled=true;posix_stop(&a->backend);posix_tools_cancel(a->tools);if(a->io && desktop_io_kind(a->io)!=DESKTOP_SAVE_PROFILE)desktop_io_cancel(a->io);}
 bool desktop_diagnostic(desktop_app_t *a,uint32_t ip,bool trace){if(a->scanning || a->tools || a->io || a->closing || a->selected>=a->interface_count)return false;a->tools=posix_tools_start(&a->interfaces[a->selected],ip,a->profile.icmp_timeout_ms,trace);if(!a->tools)return false;a->tracing=trace;if(trace){a->trace_count=0;a->trace_ip=ip;a->trace_interface=a->interfaces[a->selected].index;}return true;}
 static const char *diagnostic_status(const desktop_app_t *a,uint32_t status){
     switch(status){
@@ -140,7 +181,7 @@ void desktop_detail(const desktop_app_t *a,size_t index,char *out,size_t capacit
 void desktop_network_text(const desktop_app_t *a,char *out,size_t capacity){if(a->selected>=a->interface_count){snprintf(out,capacity,"%s",desktop_tr(a,"Select a network interface","Выберите сетевой интерфейс"));return;}const posix_interface_t *nic=&a->interfaces[a->selected];char ip[32],gateway[32],dns[128]="",metric[32];ipv4_format(nic->ip,ip,sizeof(ip));if(nic->gateway)ipv4_format(nic->gateway,gateway,sizeof(gateway));else snprintf(gateway,sizeof(gateway),"—");if(nic->has_metric)snprintf(metric,sizeof(metric),"%u",nic->metric);else snprintf(metric,sizeof(metric),"—");for(size_t i=0;i<nic->dns_count;++i){char value[32];ipv4_format(nic->dns[i],value,sizeof(value));size_t n=strlen(dns);snprintf(dns+n,sizeof(dns)-n,"%s%s",i ? ", ":"",value);}snprintf(out,capacity,"%s | %s/%u | %s: %s | DNS: %s | %s: %s | %s: %s",nic->name,ip,nic->prefix,desktop_tr(a,"Gateway","Шлюз"),gateway,dns[0] ? dns:"—",desktop_tr(a,"Metric","Метрика"),metric,desktop_tr(a,"Profile","Профиль"),a->profile.name);}
 void desktop_status_text(const desktop_app_t *a,char *out,size_t capacity){
     statistics_t stats=statistics_compute(a->hosts,a->host_count,a->completed);
-    const char *state=desktop_tr(a,a->scanning ? "Scanning":a->tools ? "Diagnostics":a->io ? "File operation":a->monitoring ? "Monitoring":a->names_pending ? "Names":"Ready",a->scanning ? "Сканирование":a->tools ? "Диагностика":a->io ? "Работа с файлом":a->monitoring ? "Мониторинг":a->names_pending ? "Имена":"Готово");
+    const char *state=desktop_tr(a,a->scanning ? "Scanning":a->tools ? "Diagnostics":(a->io || a->history_loading || a->history_pending) ? "File operation":a->monitoring ? "Monitoring":a->names_pending ? "Names":"Ready",a->scanning ? "Сканирование":a->tools ? "Диагностика":(a->io || a->history_loading || a->history_pending) ? "Работа с файлом":a->monitoring ? "Мониторинг":a->names_pending ? "Имена":"Готово");
     uint64_t elapsed=a->scanning && a->scan_started_ms ? monotonic_ms()-a->scan_started_ms:a->scan_elapsed_ms;
     snprintf(out,capacity,"%s | %s: %zu | %s: %zu | %s: %u / %u | %llu.%03llu %s",state,desktop_tr(a,"Online","В сети"),stats.online,desktop_tr(a,"Offline","Не в сети"),stats.offline,desktop_tr(a,"Scanned","Проверено"),a->completed,a->total,(unsigned long long)(elapsed/1000),(unsigned long long)(elapsed%1000),desktop_tr(a,"s","с"));
 }
@@ -194,7 +235,7 @@ bool desktop_profile_configure(desktop_app_t *a,const char *name,const char *ran
         ok=ok && ports_parse(ports,strlen(ports),p->ports,65535,&p->port_count) && profile_validate(p,NULL,0);
         uint64_t total=0;ok=ok && ranges_normalize(p->ranges,&p->range_count,&total) && total<=65536;
     }
-    if(ok){posix_invalidate_names(&a->backend);a->profile=*p;memset(a->arp_only,0,sizeof(a->arp_only));monitor_init(&a->monitor,a->hosts,&a->host_count,DESKTOP_HOSTS,a->log,10000);a->error[0]=0;}
+    if(ok){posix_invalidate_names(&a->backend);a->profile=*p;a->error[0]=0;}
     else if(!a->error[0])snprintf(a->error,sizeof(a->error),"%s",desktop_tr(a,"Invalid profile settings","Некорректные параметры профиля"));
     free(p);return ok;
 }

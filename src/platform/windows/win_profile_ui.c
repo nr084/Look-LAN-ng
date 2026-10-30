@@ -1,4 +1,5 @@
 #include "win_profile_ui.h"
+#include "win_theme.h"
 #include "win_files.h"
 #include "ports.h"
 #include "../../resources/resource.h"
@@ -48,6 +49,7 @@ static bool read_editor(HWND dialog, editor_t *editor) {
     p->monitor_interval_sec = intervals[selected]; return profile_validate(p,NULL,0);
 }
 static INT_PTR CALLBACK editor_proc(HWND dialog, UINT message, WPARAM w, LPARAM l) {
+    LRESULT themed;if(win_theme_message(dialog,message,w,l,&themed))return (INT_PTR)themed;
     editor_t *e = (editor_t *)GetWindowLongPtrW(dialog,DWLP_USER);
     if (message == WM_INITDIALOG) {
         e = (editor_t *)l; SetWindowLongPtrW(dialog,DWLP_USER,l); SetWindowTextW(dialog,lang(e,L"Scan profile",L"Профиль сканирования"));
@@ -91,12 +93,18 @@ bool win_profile_ui_smoke(HWND owner) {
     free(candidate); return ok;
 }
 bool win_profile_file_dialog(HWND owner, bool save, bool ru, wchar_t *path) {
-    wchar_t directory[MAX_PATH] = L""; win_profile_directory(directory,MAX_PATH,save);
+    wchar_t directory[MAX_PATH] = L""; win_profile_directory(directory,MAX_PATH,false);
     OPENFILENAMEW ofn = {0}; ofn.lStructSize = sizeof(ofn); ofn.hwndOwner = owner; ofn.lpstrFile = path; ofn.nMaxFile = MAX_PATH;
     ofn.lpstrFilter = ru ? L"Профили Look@LAN-ng\0*.lanprofile\0Все файлы\0*.*\0\0" : L"Look@LAN-ng profiles\0*.lanprofile\0All files\0*.*\0\0";
     ofn.lpstrDefExt = L"lanprofile"; ofn.lpstrInitialDir = directory; ofn.Flags = OFN_EXPLORER|OFN_NOCHANGEDIR|OFN_PATHMUSTEXIST|(save ? OFN_OVERWRITEPROMPT : OFN_FILEMUSTEXIST);
     ofn.lpstrTitle = ru ? (save ? L"Сохранить профиль" : L"Открыть профиль") : (save ? L"Save profile" : L"Open profile");
-    return save ? GetSaveFileNameW(&ofn) != 0 : GetOpenFileNameW(&ofn) != 0;
+    if(!save)return GetOpenFileNameW(&ofn)!=0;
+    if(!GetSaveFileNameW(&ofn))return false;
+    wchar_t name[MAX_PATH];const wchar_t *slash=wcsrchr(path,L'\\');wcscpy_s(name,MAX_PATH,slash?slash+1:path);
+    if(!win_profile_directory(directory,MAX_PATH,true) || wcslen(directory)+wcslen(name)+2>=MAX_PATH)return false;
+    wchar_t managed[MAX_PATH];swprintf_s(managed,MAX_PATH,L"%ls\\%ls",directory,name);
+    if(_wcsicmp(path,managed) && GetFileAttributesW(managed)!=INVALID_FILE_ATTRIBUTES && MessageBoxW(owner,ru?L"Заменить существующий профиль в папке profiles?":L"Replace the existing profile in the profiles folder?",L"Look@LAN-ng",MB_YESNO|MB_ICONQUESTION)!=IDYES)return false;
+    wcscpy_s(path,MAX_PATH,managed);return true;
 }
 bool win_report_file_dialog(HWND owner, report_format_t format, bool ru, wchar_t *path) {
     const wchar_t *filters[] = {L"CSV\0*.csv\0\0",L"Text\0*.txt\0\0",L"HTML\0*.html\0\0"}; const wchar_t *extensions[] = {L"csv",L"txt",L"html"};

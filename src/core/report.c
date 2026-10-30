@@ -26,6 +26,7 @@ static void utc_timestamp(uint64_t seconds, char *out, size_t cap) {
     if (!utc || !strftime(out,cap,"%Y-%m-%d %H:%M:%S",utc)) snprintf(out,cap,"—");
 }
 static const char *status(const lan_host_t *h, bool ru) {
+    if (h->historical) return ru ? "ИСТОРИЯ" : "HISTORY";
     if (!h->first_seen || h->cache_only) return ru ? "НЕИЗВЕСТНО" : "UNKNOWN";
     if (!h->online) return ru ? "НЕ В СЕТИ" : "OFFLINE";
     if (h->new_device) return ru ? "НОВОЕ" : "NEW";

@@ -45,6 +45,7 @@ try {
     Copy-Item -LiteralPath $packed -Destination $destination -Force
     [ordered]@{
         version=$version;architecture=$Architecture;copyright=(Get-Item $exe).VersionInfo.LegalCopyright
+        build_preflight=(Get-Content (Join-Path (Split-Path $exe) 'preflight.json') -Raw | ConvertFrom-Json)
         upx_version=$upxVersion;upx_release=$release.html_url;upx_archive_sha256=$digest
         options='--ultra-brute --lzma';integrity='passed';packed_smokes=$smokes
         runner_arch=$env:PROCESSOR_ARCHITECTURE;unpacked_bytes=(Get-Item $exe).Length
