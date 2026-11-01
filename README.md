@@ -4,7 +4,7 @@
 
 **EN:** A portable LAN scanner and network monitor with native Russian/English interfaces. Windows x86/x64/ARM64 and Ubuntu/Linux x64; macOS universal is built and published separately on Mac. No cloud, accounts, telemetry, drivers or background services.
 
-[Release 1.4.0](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.4.0) · [Build / Сборка](BUILD.md) · [Profiles and history / Профили и история](docs/PROFILES.md) · [Validation / Проверки](docs/VALIDATION_1.4.0.md)
+[Release 1.4.0](https://github.com/nr084/Look-LAN-ng/releases/tag/v1.4.0) · [Build / Сборка](BUILD.md) · [Profiles and history / Профили и история](docs/PROFILES.md)
 
 ## Скачать / Download
 
@@ -64,7 +64,7 @@ Windows и Linux компилируются локально на Windows. Пе�
 
 Windows and Linux are compiled locally on Windows. Every build verifies the latest official stable Clang/LLVM-MinGW and refreshes IEEE MA-L data; failed checks stop the build. Stable UPX uses maximum compression followed by integrity and startup checks; raw diagnostic binaries stay local. Actions only validates prebuilt ARM64 binaries, without compilation.
 
-Runtime coverage: Windows 11 x64, native Windows 11 ARM64 runner, Ubuntu 26.04.1 x64 VM and macOS 27.2 Apple Silicon. Mac: 9/9 native and 9/9 Rosetta tests, actual LAN, profiles/history, monitoring and exports passed. Native Intel/older macOS and full physical DPI/NIC matrices remain untested. [Windows/Linux evidence](docs/VALIDATION_1.4.0.md) · [Mac evidence](docs/MACOS_VALIDATION.md).
+Runtime coverage: Windows 11 x64, native Windows 11 ARM64 runner, Ubuntu 26.04.1 x64 VM and macOS 27.2 Apple Silicon. Mac: 9/9 native and 9/9 Rosetta tests, actual LAN, profiles/history, monitoring and exports passed. Native Intel/older macOS and full physical DPI/NIC matrices remain untested.
 
 © nr084 — год вычисляется при сборке / year generated at build time.
 

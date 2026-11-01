@@ -60,7 +60,7 @@ def main():
             f'Look@LAN-ng {version}\n'
             'Собрано на Mac. Перетащите приложение в Applications.\n'
             'Built on Mac. Drag the app into Applications.\n'
-            'Ad-hoc signed; not notarized. Native validation/limitations: docs/MACOS_VALIDATION.md.\n',
+            'Ad-hoc signed; not notarized. Validation/limitations: https://github.com/nr084/Look-LAN-ng/releases.\n',
             encoding='utf-8')
         image = Path(temp) / 'candidate.dmg'
         run('hdiutil', 'create', '-srcfolder', stage, '-volname', 'Look@LAN-ng',
@@ -89,7 +89,7 @@ def main():
         'binary_sha256': digest(executable), 'signature': 'ad-hoc hardened runtime, verified',
         'notarization': 'not_done', 'dmg': 'ULMO/LZMA; integrity, mount, hashes/modes passed',
         'upx': 'not applied; macOS support disabled upstream, no force',
-        'runtime_validation': 'see build/validation/macos-native and docs/MACOS_VALIDATION.md',
+        'runtime_validation': 'local reports: build/validation/macos-native; public summary: GitHub release notes',
         'published': False,
     }
     (output / 'package.json').write_text(json.dumps(metadata, indent=2) + '\n')

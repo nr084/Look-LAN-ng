@@ -42,3 +42,9 @@ Capture final real Windows/Ubuntu scans; blur every IP before committing screens
 On Mac, use `bash tools/build-macos.sh`: it checks official latest stable LLVM/Homebrew, downloads fresh IEEE MA-L, records versions/date/hashes, configures a fresh universal CMake cache and checks arm64+x86_64 slices. No Windows/Linux compilation is done on Mac. Run native CTest and Rosetta tests, validate Cocoa with an isolated `--validation-data-dir /absolute/test/path`, then package with `python3 tools/package-macos.py --release`. Keep the raw diagnostics local.
 
 Publish only the checked DMG using `tools/publish-macos-release.py --version 1.4.0 --source-repo <clean-checkout> --notes docs/RELEASE_NOTES_MACOS_1.4.0.md --add-assets-to-published-release`. This preserves the four Windows/Linux assets, their IDs/sizes/hashes and the existing tag; it replaces only the marked macOS notes block. Every screenshot must have all IP/MAC regions strongly blurred and checked before upload.
+
+## Repository contents / Содержимое репозитория
+
+GitHub stores source code, build/test tools, release packages and public project/user documentation. Agent instructions, working notes, status journals and internal validation reports stay local and are excluded by `.gitignore`. Public release notes retain test summaries and known limitations.
+
+На GitHub хранятся исходники, файлы сборки/тестов, релизы и публичные описания. Агентские инструкции, рабочие заметки, журналы состояния и внутренние отчёты остаются локально. Результаты проверок и известные ограничения кратко указываются в описании релиза.

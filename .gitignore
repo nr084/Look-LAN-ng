@@ -8,3 +8,21 @@ profiles/
 *.lanprofile
 *.lanhistory
 *.ini.ui
+
+# Local agent instructions, work logs and internal reports
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+PROJECT_STATE.md
+PROJECT_HISTORY.md
+SPEC_STATUS.md
+RELEASE_CHECK.md
+*_VALIDATION.md
+*_VALIDATION_HISTORY.md
+VALIDATION_*.md
+*_VALIDATION_*.md
+/docs/PORT_RELEASE_NOTES.md
+/docs/README_RU.md
+/docs/RELEASES.md
+/docs/RELEASE_NOTES_1.3.*.md
+/docs/RELEASE_NOTES_LINUX_1.3.0.md
