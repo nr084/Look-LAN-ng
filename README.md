@@ -66,6 +66,6 @@ Windows and Linux are compiled locally on Windows. Every build verifies the late
 
 Runtime coverage: Windows 11 x64, native Windows 11 ARM64 runner, Ubuntu 26.04.1 x64 VM and macOS 27.2 Apple Silicon. Mac: 9/9 native and 9/9 Rosetta tests, actual LAN, profiles/history, monitoring and exports passed. Native Intel/older macOS and full physical DPI/NIC matrices remain untested.
 
-© nr084 — год вычисляется при сборке / year generated at build time.
+© nr084, 2026
 
 macOS: `tools/build-macos.sh` checks stable LLVM and IEEE before every native universal build; `tools/package-macos.py --release` signs and validates the compressed DMG. Cocoa supports System/Light/Dark; a saved profile enables persistent settings. The Mac DMG is added to the existing release without replacing its Windows/Linux ZIPs or tag.
